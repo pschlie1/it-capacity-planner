@@ -11,7 +11,6 @@ interface Settings {
   holidays: { name: string; week: number }[];
   capacityThresholds: { amber: number; red: number };
   roleTemplates: { name: string; roles: Record<string, number> }[];
-  blendedRate?: number;
   estimationConfig?: {
     percentages?: {
       requirements?: number;
