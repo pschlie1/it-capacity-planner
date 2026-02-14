@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Team {
+  id                 String   @id @default(uuid())
+  name               String
+  pmFte              Float    @default(0)
+  productManagerFte  Float    @default(0)
+  uxDesignerFte      Float?
+  businessAnalystFte Float    @default(0)
+  scrumMasterFte     Float    @default(0)
+  architectFte       Float    @default(0)
+  developerFte       Float    @default(0)
+  qaFte              Float    @default(0)
+  devopsFte          Float    @default(0)
+  dbaFte             Float    @default(0)
+  kloTlmHoursPerWeek Float    @default(0)
+  adminPct           Float    @default(25)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  teamEstimates TeamEstimate[]
+  contractors   Contractor[]
+}
+
+model Project {
+  id              String   @id @default(uuid())
+  name            String
+  priority        Int
+  status          String   @default("proposed")
+  startWeekOffset Int      @default(0)
+  description     String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  teamEstimates    TeamEstimate[]
+  priorityOverrides PriorityOverride[]
+}
+
+model TeamEstimate {
+  id          String @id @default(uuid())
+  projectId   String
+  teamId      String
+  design      Float  @default(0)
+  development Float  @default(0)
+  testing     Float  @default(0)
+  deployment  Float  @default(0)
+  postDeploy  Float  @default(0)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team    Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, teamId])
+}
+
+model Scenario {
+  id        String   @id @default(uuid())
+  name      String
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  priorityOverrides PriorityOverride[]
+  contractors       Contractor[]
+}
+
+model PriorityOverride {
+  id         String @id @default(uuid())
+  scenarioId String
+  projectId  String
+  priority   Int
+
+  scenario Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([scenarioId, projectId])
+}
+
+model Contractor {
+  id         String @id @default(uuid())
+  scenarioId String
+  teamId     String
+  roleKey    String
+  fte        Float
+  weeks      Int
+  label      String
+  startWeek  Int    @default(0)
+
+  scenario Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
