@@ -1,10 +1,24 @@
-import DOMPurify from 'isomorphic-dompurify';
-
 /**
- * Sanitize a string to prevent XSS. Strips all HTML tags.
+ * Lightweight HTML sanitizer — strips all HTML tags and dangerous patterns.
+ * Zero dependencies, works in serverless (no DOM required).
  */
 export function sanitize(input: string): string {
-  return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] });
+  return input
+    // Strip HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Remove javascript: protocol
+    .replace(/javascript\s*:/gi, '')
+    // Remove on* event handlers that might survive
+    .replace(/on\w+\s*=/gi, '')
+    // Decode common HTML entities
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    // Re-strip any tags that appeared after decoding
+    .replace(/<[^>]*>/g, '')
+    .trim();
 }
 
 /**
