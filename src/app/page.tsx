@@ -22,6 +22,8 @@ import ResourceDirectory from '@/components/ResourceDirectory';
 import ResourceDetail from '@/components/ResourceDetail';
 import SkillsMatrix from '@/components/SkillsMatrix';
 import ResourceAnalytics from '@/components/ResourceAnalytics';
+import ProjectPipeline from '@/components/ProjectPipeline';
+import EstimationWorkspace from '@/components/EstimationWorkspace';
 import {
   BarChart3, Users, FolderKanban, Sparkles, TrendingUp, AlertTriangle,
   CheckCircle2, XCircle, Plus, Trash2, Lock, Unlock, ChevronDown, X, Edit2, Save,
@@ -57,6 +59,8 @@ interface Project {
   tshirtSize?: string; category?: string; sponsor?: string; businessValue?: string;
   requiredSkills?: string[]; dependencies?: string[]; milestones?: Milestone[];
   quarterTarget?: string; riskLevel?: string; riskNotes?: string; committedDate?: string;
+  workflowStatus?: string; estimatedCost?: number | null; estimatedWeeks?: number | null;
+  teamSizeRecommended?: number | null; capexAmount?: number | null; opexAmount?: number | null;
 }
 
 interface Scenario {
@@ -79,7 +83,7 @@ interface TeamCapacity {
   roles?: Record<string, { fte: number; hoursPerWeek: number }>;
 }
 
-type Tab = 'dashboard' | 'portfolio' | 'teams' | 'resources' | 'skills' | 'projects' | 'scenarios' | 'ai' | 'ai-intake' | 'ai-optimize' | 'ai-briefing' | 'ai-review' | 'reports' | 'resource-analytics' | 'settings';
+type Tab = 'dashboard' | 'portfolio' | 'pipeline' | 'teams' | 'resources' | 'skills' | 'projects' | 'scenarios' | 'ai' | 'ai-intake' | 'ai-optimize' | 'ai-briefing' | 'ai-review' | 'reports' | 'resource-analytics' | 'settings';
 
 const STATUS_COLORS: Record<string, string> = {
   not_started: 'bg-slate-500/20 text-slate-400',
@@ -124,6 +128,7 @@ export default function Home() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
+  const [estimatingProjectId, setEstimatingProjectId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -187,6 +192,7 @@ export default function Home() {
     { label: 'Overview', items: [
       { id: 'dashboard' as Tab, label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" />, badge: null },
       { id: 'portfolio' as Tab, label: 'Portfolio', icon: <PieChart className="w-4 h-4" />, badge: `${projects.length}` },
+      { id: 'pipeline' as Tab, label: 'Pipeline', icon: <ArrowUpDown className="w-4 h-4" /> },
     ]},
     { label: 'Planning', items: [
       { id: 'teams' as Tab, label: 'Teams', icon: <Users className="w-4 h-4" />, badge: `${teams.length}` },
@@ -339,6 +345,27 @@ export default function Home() {
             onNavigate={(t: string) => setTab(t as Tab)}
           />}
           {tab === 'portfolio' && <PortfolioDashboard projects={projects} allocations={allocations} teams={teams} teamCapacities={teamCapacities} />}
+          {tab === 'pipeline' && (
+            estimatingProjectId
+              ? <EstimationWorkspace
+                  projectId={estimatingProjectId}
+                  projectName={projects.find(p => p.id === estimatingProjectId)?.name || 'Project'}
+                  teams={teams}
+                  onBack={() => setEstimatingProjectId(null)}
+                />
+              : <ProjectPipeline
+                  projects={projects}
+                  onSelectProject={(id) => setEstimatingProjectId(id)}
+                  onAdvanceWorkflow={async (id, newStatus) => {
+                    await fetch(`/api/projects/${id}/workflow`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: newStatus }),
+                    });
+                    fetchData();
+                  }}
+                />
+          )}
           {tab === 'resources' && (
             selectedResourceId
               ? <ResourceDetail resourceId={selectedResourceId} onBack={() => setSelectedResourceId(null)} />

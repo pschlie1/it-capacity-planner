@@ -7,6 +7,7 @@ import { Save, Calendar, Clock, AlertTriangle, Users, Upload, Download, Shield, 
 interface Settings {
   fiscalYearStartMonth: number;
   defaultHoursPerWeek: number;
+  blendedRate: number;
   holidays: { name: string; week: number }[];
   capacityThresholds: { amber: number; red: number };
   roleTemplates: { name: string; roles: Record<string, number> }[];
@@ -191,6 +192,13 @@ export default function SettingsPage() {
               <label className="text-xs text-muted-foreground">Default Hours Per Week</label>
               <input type="number" min="20" max="60" value={settings.defaultHoursPerWeek}
                 onChange={e => setSettings(s => s ? { ...s, defaultHoursPerWeek: parseInt(e.target.value) || 40 } : s)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Blended Rate ($/hr)</label>
+              <p className="text-xs text-muted-foreground mb-1">Used for project cost estimation</p>
+              <input type="number" min="25" max="500" value={settings.blendedRate}
+                onChange={e => setSettings(s => s ? { ...s, blendedRate: parseFloat(e.target.value) || 95 } : s)}
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
             </div>
           </div>

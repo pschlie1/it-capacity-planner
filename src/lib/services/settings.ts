@@ -13,6 +13,7 @@ export async function getSettings(orgId: string) {
   return {
     fiscalYearStartMonth: org.fiscalYearStartMonth,
     defaultHoursPerWeek: org.defaultHoursPerWeek,
+    blendedRate: org.blendedRate ?? 95,
     holidays: parseJson(org.holidays),
     capacityThresholds: { amber: org.capacityAmber, red: org.capacityRed },
     roleTemplates: parseJson(org.roleTemplates),
@@ -23,6 +24,7 @@ export async function updateSettings(orgId: string, userId: string, data: any) {
   const updateData: any = {};
   if (data.fiscalYearStartMonth !== undefined) updateData.fiscalYearStartMonth = data.fiscalYearStartMonth;
   if (data.defaultHoursPerWeek !== undefined) updateData.defaultHoursPerWeek = data.defaultHoursPerWeek;
+  if (data.blendedRate !== undefined) updateData.blendedRate = data.blendedRate;
   if (data.holidays !== undefined) updateData.holidays = data.holidays;
   if (data.capacityThresholds !== undefined) {
     updateData.capacityAmber = data.capacityThresholds.amber;
