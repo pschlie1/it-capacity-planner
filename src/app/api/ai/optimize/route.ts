@@ -1,9 +1,17 @@
+import { validateBody, checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
+import { aiOptimizeSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
 import OpenAI from 'openai';
 
 export async function POST(req: Request) {
-  const { type } = await req.json(); // 'portfolio' | 'resource' | 'hiring' | 'cost'
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(ip);
+  if (!allowed) return getRateLimitResponse();
+
+  const validated = await validateBody(req, aiOptimizeSchema);
+  if ('error' in validated) return validated.error;
+  const { type } = validated.data; // 'portfolio' | 'resource' | 'hiring' | 'cost'
   const { contextText, data } = buildAIContext();
 
   const apiKey = process.env.OPENAI_API_KEY;

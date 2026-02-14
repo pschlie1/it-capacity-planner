@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
+import { validateBody, checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
+import { aiForecastSchema } from '@/lib/schemas';
 import OpenAI from 'openai';
 
 export async function POST(req: Request) {
-  const { type, resourceName } = await req.json(); // 'risk' | 'crunch' | 'attrition' | 'trend'
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(ip);
+  if (!allowed) return getRateLimitResponse();
+
+  const validated = await validateBody(req, aiForecastSchema);
+  if ('error' in validated) return validated.error;
+  const { type, resourceName } = validated.data;
   const { contextText, data } = buildAIContext();
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -65,6 +73,6 @@ Respond with ONLY valid JSON:
     const result = JSON.parse(completion.choices[0].message.content || '{}');
     return NextResponse.json(result);
   } catch (error: unknown) {
-    return NextResponse.json({ error: 'AI service error', details: (error as Error).message }, { status: 500 });
+    return safeErrorResponse(error, 'AI forecast');
   }
 }

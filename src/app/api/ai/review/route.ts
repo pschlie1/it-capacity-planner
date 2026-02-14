@@ -1,8 +1,13 @@
+import { checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
 import OpenAI from 'openai';
 
-export async function POST() {
+export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(ip);
+  if (!allowed) return getRateLimitResponse();
+
   const { contextText, data } = buildAIContext();
 
   const apiKey = process.env.OPENAI_API_KEY;

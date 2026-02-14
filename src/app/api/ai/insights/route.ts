@@ -1,8 +1,13 @@
+import { checkRateLimit, getRateLimitResponse, getClientIp } from '@/lib/api-utils';
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
 import OpenAI from 'openai';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(ip, 30);
+  if (!allowed) return getRateLimitResponse();
+
   const { contextText, data } = buildAIContext();
 
   // Generate seed insights from data even without API key

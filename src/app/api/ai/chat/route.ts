@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
 import { createProject, getTeams, getTeamEstimates, updateProject, createScenario, setPriorityOverrides, addContractor, getProjects } from '@/lib/store';
 import { createAssignment, getResources } from '@/lib/resource-store';
+import { validateBody, checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
+import { aiChatSchema } from '@/lib/schemas';
 import OpenAI from 'openai';
 
 const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -53,7 +55,16 @@ function executeTool(name: string, args: Record<string, unknown>): string {
 }
 
 export async function POST(req: Request) {
-  const { messages: clientMessages } = await req.json();
+  // Rate limiting
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(ip);
+  if (!allowed) return getRateLimitResponse();
+
+  // Input validation
+  const validated = await validateBody(req, aiChatSchema);
+  if ('error' in validated) return validated.error;
+  const clientMessages = validated.data.messages;
+
   const { contextText } = buildAIContext();
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -120,6 +131,6 @@ ${contextText}`
 
     return NextResponse.json({ response: content, suggestions });
   } catch (error: unknown) {
-    return NextResponse.json({ error: 'AI service error', details: (error as Error).message }, { status: 500 });
+    return safeErrorResponse(error, 'AI chat');
   }
 }

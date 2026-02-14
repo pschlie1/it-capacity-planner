@@ -1,9 +1,17 @@
+import { validateBody, checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
+import { aiScenarioSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
 import OpenAI from 'openai';
 
 export async function POST(req: Request) {
-  const { description } = await req.json();
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(ip);
+  if (!allowed) return getRateLimitResponse();
+
+  const validated = await validateBody(req, aiScenarioSchema);
+  if ('error' in validated) return validated.error;
+  const { description } = validated.data;
   const { contextText, data } = buildAIContext();
 
   const apiKey = process.env.OPENAI_API_KEY;

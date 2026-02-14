@@ -1,9 +1,15 @@
+import { validateBody, checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
+import { aiMessageSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 import { getTeams, getProjects, getTeamEstimates } from '@/lib/store';
 import { runAllocationEngine, TeamData, ProjectData } from '@/lib/allocation-engine';
 import OpenAI from 'openai';
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(ip);
+  if (!allowed) return getRateLimitResponse();
+
   const body = await req.json();
   const message = body.message;
 
