@@ -29,7 +29,8 @@ import {
   ChevronRight, Calendar, Clock, Target, Zap, Shield, DollarSign,
   Activity, PieChart, ArrowUp, ArrowDown, Filter, Download, Upload,
   UserPlus, UserMinus, Eye, MoreHorizontal, Flag, Hash, Gauge,
-  UserCheck, Grid3X3, BarChart2, MessageSquare, Inbox, Lightbulb, PlayCircle, ClipboardList
+  UserCheck, Grid3X3, BarChart2, MessageSquare, Inbox, Lightbulb, PlayCircle, ClipboardList,
+  Menu
 } from 'lucide-react';
 
 interface Team {
@@ -121,6 +122,7 @@ export default function Home() {
   const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -210,75 +212,86 @@ export default function Home() {
     );
   }
 
+  const sidebarShowFull = !sidebarCollapsed;
+
   return (
     <div className="min-h-screen bg-background flex">
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 md:hidden" onClick={() => setMobileOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} flex-shrink-0 border-r border-border bg-card/30 flex flex-col transition-all duration-200 sticky top-0 h-screen`}>
+      <aside className={`
+        fixed md:sticky top-0 h-screen z-50 md:z-auto
+        flex-shrink-0 border-r border-border bg-card/95 md:bg-card/30 backdrop-blur-md md:backdrop-blur-none flex flex-col
+        transition-all duration-300 ease-in-out
+        ${mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
+        md:translate-x-0
+        ${sidebarCollapsed ? 'md:w-16 lg:w-16' : 'md:w-16 lg:w-56'}
+      `}>
         {/* Logo */}
         <div className="p-3 border-b border-border flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
             <BarChart3 className="w-5 h-5 text-primary-foreground" />
           </div>
-          {!sidebarCollapsed && (
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold truncate">IT Capacity Planner</h1>
-              <p className="text-[9px] text-muted-foreground">Enterprise Resource Planning</p>
-            </div>
-          )}
+          {/* Show title on mobile drawer always, on desktop only when expanded */}
+          <div className={`min-w-0 ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:block'} block`}>
+            <h1 className="text-sm font-bold truncate">IT Capacity Planner</h1>
+            <p className="text-[9px] text-muted-foreground">Enterprise Resource Planning</p>
+          </div>
+          {/* Close button on mobile */}
+          <button onClick={() => setMobileOpen(false)} className="ml-auto p-1 rounded-lg hover:bg-muted md:hidden">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Scenario Selector */}
-        {!sidebarCollapsed && (
-          <div className="px-3 py-2 border-b border-border">
-            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Scenario</label>
-            <select
-              value={selectedScenario}
-              onChange={e => setSelectedScenario(e.target.value)}
-              className="w-full mt-1 px-2 py-1 text-xs rounded bg-muted border border-border focus:outline-none focus:ring-1 focus:ring-primary/50"
-            >
-              <option value="">Baseline</option>
-              {scenarios.map(s => (
-                <option key={s.id} value={s.id}>{s.name} {s.locked ? '🔒' : ''}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Scenario Selector - show on mobile drawer and desktop expanded */}
+        <div className={`px-3 py-2 border-b border-border ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:block'} block`}>
+          <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Scenario</label>
+          <select
+            value={selectedScenario}
+            onChange={e => setSelectedScenario(e.target.value)}
+            className="w-full mt-1 px-2 py-1 text-xs rounded bg-muted border border-border focus:outline-none focus:ring-1 focus:ring-primary/50"
+          >
+            <option value="">Baseline</option>
+            {scenarios.map(s => (
+              <option key={s.id} value={s.id}>{s.name} {s.locked ? '🔒' : ''}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-2">
           {navSections.map(section => (
             <div key={section.label} className="mb-2">
-              {!sidebarCollapsed && (
-                <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{section.label}</p>
-              )}
+              {/* Section label: show on mobile drawer and desktop expanded */}
+              <p className={`px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:block'} block`}>{section.label}</p>
               {section.items.map(item => (
                 <button
                   key={item.id}
-                  onClick={() => { setTab(item.id); if (item.id !== 'resources') setSelectedResourceId(null); }}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ${
+                  onClick={() => { setTab(item.id); if (item.id !== 'resources') setSelectedResourceId(null); setMobileOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 text-sm transition-colors ${
                     tab === item.id
                       ? 'bg-primary/10 text-primary border-r-2 border-primary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                  title={sidebarCollapsed ? item.label : undefined}
+                  } ${sidebarCollapsed ? 'md:justify-center lg:justify-center' : 'md:justify-center lg:justify-start'}`}
+                  title={item.label}
                 >
-                  {item.icon}
-                  {!sidebarCollapsed && (
-                    <>
-                      <span className="flex-1 text-left">{item.label}</span>
-                      {item.badge && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted">{item.badge}</span>}
-                    </>
-                  )}
+                  <span className="flex-shrink-0">{item.icon}</span>
+                  {/* Label: always on mobile drawer, hidden on tablet, shown on desktop expanded */}
+                  <span className={`flex-1 text-left ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:inline'} inline`}>{item.label}</span>
+                  {item.badge && <span className={`text-[10px] px-1.5 py-0.5 rounded-full bg-muted ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:inline'} inline`}>{item.badge}</span>}
                 </button>
               ))}
             </div>
           ))}
         </nav>
 
-        {/* Collapse toggle */}
+        {/* Collapse toggle - only on desktop */}
         <button
           onClick={() => setSidebarCollapsed(c => !c)}
-          className="p-2 border-t border-border text-muted-foreground hover:text-foreground text-xs flex items-center justify-center gap-1"
+          className="hidden lg:flex p-2 border-t border-border text-muted-foreground hover:text-foreground text-xs items-center justify-center gap-1"
         >
           {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <><ChevronDown className="w-3 h-3 -rotate-90" /> <span>Collapse</span></>}
         </button>
@@ -287,24 +300,28 @@ export default function Home() {
       {/* Main Content */}
       <main className="flex-1 min-w-0">
         {/* Top bar */}
-        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40 px-6 py-2 flex items-center justify-between">
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40 px-3 md:px-6 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">{navSections.flatMap(s => s.items).find(i => i.id === tab)?.label}</h2>
+            {/* Hamburger for mobile */}
+            <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-muted md:hidden flex-shrink-0">
+              <Menu className="w-5 h-5" />
+            </button>
+            <h2 className="text-base md:text-lg font-semibold truncate">{navSections.flatMap(s => s.items).find(i => i.id === tab)?.label}</h2>
             {tab !== 'dashboard' && (
-              <span className="text-xs text-muted-foreground">/ {navSections.find(s => s.items.some(i => i.id === tab))?.label}</span>
+              <span className="text-xs text-muted-foreground hidden sm:inline">/ {navSections.find(s => s.items.some(i => i.id === tab))?.label}</span>
             )}
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" />{totalFte.toFixed(0)} FTE</span>
-            <span className="flex items-center gap-1"><FolderKanban className="w-3 h-3" />{activeProjects} Active</span>
-            {atRiskProjects > 0 && <span className="flex items-center gap-1 text-red-400"><AlertTriangle className="w-3 h-3" />{atRiskProjects} At Risk</span>}
-            <span className="hidden md:inline text-[10px] text-muted-foreground/50">Press 1-8 for nav · [ toggle sidebar</span>
-            <span className="text-xs text-muted-foreground">{session.user.name || session.user.email}</span>
+          <div className="flex items-center gap-2 md:gap-3 text-xs text-muted-foreground flex-shrink-0">
+            <span className="hidden sm:flex items-center gap-1"><Users className="w-3 h-3" />{totalFte.toFixed(0)} FTE</span>
+            <span className="hidden md:flex items-center gap-1"><FolderKanban className="w-3 h-3" />{activeProjects} Active</span>
+            {atRiskProjects > 0 && <span className="hidden sm:flex items-center gap-1 text-red-400"><AlertTriangle className="w-3 h-3" />{atRiskProjects}</span>}
+            <span className="hidden lg:inline text-[10px] text-muted-foreground/50">Press 1-8 for nav · [ toggle sidebar</span>
+            <span className="text-xs text-muted-foreground hidden md:inline truncate max-w-[120px]">{session.user.name || session.user.email}</span>
             <button onClick={() => signOut()} className="text-[10px] px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground">Sign Out</button>
           </div>
         </header>
 
-        <div className="p-6">
+        <div className="p-3 md:p-6">
           {tab === 'dashboard' && <DashboardTab
             allocations={allocations} teamCapacities={teamCapacities}
             feasible={feasible} infeasible={infeasible} avgUtil={avgUtil} totalCapacity={totalCapacity}
@@ -388,7 +405,7 @@ function DashboardTab({ allocations, teamCapacities, feasible, infeasible, avgUt
   return (
     <div className="space-y-6">
       {/* KPIs Row 1 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KPICard label="Total FTE" value={totalFte.toFixed(0)} icon={<Users className="w-5 h-5" />} color="text-blue-400" />
         <KPICard label="Active Teams" value={`${teams.length}`} icon={<Target className="w-5 h-5" />} color="text-purple-400" />
         <KPICard label="Projects" value={`${projects.length}`} sub={`${feasible} feasible`} icon={<FolderKanban className="w-5 h-5" />} color="text-green-400" />
@@ -639,16 +656,16 @@ function TeamsTab({ teams, onRefresh }: { teams: Team[]; onRefresh: () => void }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:flex-1">
           <h2 className="text-lg font-semibold">Team Management</h2>
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative w-full sm:flex-1 sm:max-w-xs">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search teams..."
               className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg bg-muted border border-border" />
           </div>
         </div>
-        <button onClick={() => { setShowAdd(true); setForm({}); }} className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90">
+        <button onClick={() => { setShowAdd(true); setForm({}); }} className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4" /> Add Team
         </button>
       </div>
@@ -828,16 +845,16 @@ function ProjectsTab({ projects, teams, onRefresh }: { projects: Project[]; team
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:flex-1">
           <h2 className="text-lg font-semibold">Projects</h2>
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative w-full sm:flex-1 sm:max-w-xs">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..."
               className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg bg-muted border border-border" />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-2 py-1.5 text-xs rounded-lg bg-muted border border-border">
             <option value="all">All Status</option>
             {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -847,7 +864,7 @@ function ProjectsTab({ projects, teams, onRefresh }: { projects: Project[]; team
             {categories.map(c => <option key={c} value={c!}>{c}</option>)}
           </select>
           <button onClick={() => { setShowAdd(true); setForm({ name: '', priority: projects.length + 1, status: 'not_started', description: '', startWeekOffset: 0, teamEstimates: [] }); }}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90">
+            className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" /> Add Project
           </button>
         </div>
@@ -957,7 +974,7 @@ function ProjectsTab({ projects, teams, onRefresh }: { projects: Project[]; team
                   className="text-xs text-primary hover:underline">+ Add Team</button>
               </div>
               {form.teamEstimates.map((te, i) => (
-                <div key={i} className="grid grid-cols-8 gap-2 mb-2 items-end">
+                <div key={i} className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mb-2 items-end">
                   <div>
                     <label className="text-[10px] text-muted-foreground">Team</label>
                     <select value={te.teamId} onChange={e => { const tes = [...form.teamEstimates]; tes[i].teamId = e.target.value; setForm(f => ({ ...f, teamEstimates: tes })); }}
@@ -1154,7 +1171,7 @@ function ScenariosTab({ scenarios, teams, projects, onRefresh }: { scenarios: Sc
                     </div>
                   ))}
                   {!s.locked && (
-                    <div className="grid grid-cols-7 gap-2 mt-2 items-end">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2 mt-2 items-end">
                       <div>
                         <label className="text-[10px] text-muted-foreground">Team</label>
                         <select value={contractorForm.teamId || teams[0]?.id} onChange={e => setContractorForm(f => ({ ...f, teamId: e.target.value }))}
