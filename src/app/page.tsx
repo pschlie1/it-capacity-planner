@@ -126,23 +126,33 @@ export default function Home() {
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    const [teamsRes, projectsRes, scenariosRes] = await Promise.all([
-      fetch('/api/teams'), fetch('/api/projects'), fetch('/api/scenarios'),
-    ]);
-    const [teamsData, projectsData, scenariosData] = await Promise.all([
-      teamsRes.json(), projectsRes.json(), scenariosRes.json(),
-    ]);
-    setTeams(teamsData);
-    setProjects(projectsData);
-    setScenarios(scenariosData);
+    try {
+      const [teamsRes, projectsRes, scenariosRes] = await Promise.all([
+        fetch('/api/teams'), fetch('/api/projects'), fetch('/api/scenarios'),
+      ]);
+      // If any response is 401, redirect to login
+      if (teamsRes.status === 401 || projectsRes.status === 401 || scenariosRes.status === 401) {
+        router.push('/login');
+        return;
+      }
+      const [teamsData, projectsData, scenariosData] = await Promise.all([
+        teamsRes.json(), projectsRes.json(), scenariosRes.json(),
+      ]);
+      setTeams(Array.isArray(teamsData) ? teamsData : []);
+      setProjects(Array.isArray(projectsData) ? projectsData : []);
+      setScenarios(Array.isArray(scenariosData) ? scenariosData : []);
 
-    const allocUrl = selectedScenario ? `/api/allocations?scenarioId=${selectedScenario}` : '/api/allocations';
-    const allocRes = await fetch(allocUrl);
-    const allocData = await allocRes.json();
-    setAllocations(allocData.allocations || []);
-    setTeamCapacities(allocData.teamCapacities || []);
+      const allocUrl = selectedScenario ? `/api/allocations?scenarioId=${selectedScenario}` : '/api/allocations';
+      const allocRes = await fetch(allocUrl);
+      if (allocRes.status === 401) { router.push('/login'); return; }
+      const allocData = await allocRes.json();
+      setAllocations(allocData.allocations || []);
+      setTeamCapacities(allocData.teamCapacities || []);
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+    }
     setLoading(false);
-  }, [selectedScenario]);
+  }, [selectedScenario, router]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
