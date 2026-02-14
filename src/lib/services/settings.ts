@@ -17,6 +17,8 @@ export async function getSettings(orgId: string) {
     holidays: parseJson(org.holidays),
     capacityThresholds: { amber: org.capacityAmber, red: org.capacityRed },
     roleTemplates: parseJson(org.roleTemplates),
+    blendedRate: org.blendedRate,
+    estimationConfig: typeof org.estimationConfig === 'object' ? org.estimationConfig : {},
   };
 }
 
@@ -31,6 +33,8 @@ export async function updateSettings(orgId: string, userId: string, data: any) {
     updateData.capacityRed = data.capacityThresholds.red;
   }
   if (data.roleTemplates !== undefined) updateData.roleTemplates = data.roleTemplates;
+  if (data.blendedRate !== undefined) updateData.blendedRate = data.blendedRate;
+  if (data.estimationConfig !== undefined) updateData.estimationConfig = data.estimationConfig;
 
   await prisma.organization.update({ where: { id: orgId }, data: updateData });
   await createAuditLog({ orgId, userId, action: 'UPDATE', entity: 'Organization', entityId: orgId, changes: data });

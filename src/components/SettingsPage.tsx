@@ -11,6 +11,16 @@ interface Settings {
   holidays: { name: string; week: number }[];
   capacityThresholds: { amber: number; red: number };
   roleTemplates: { name: string; roles: Record<string, number> }[];
+  blendedRate?: number;
+  estimationConfig?: {
+    percentages?: {
+      requirements?: number;
+      technicalDesign?: number;
+      testing?: number;
+      support?: number;
+    };
+    sprintConsolidation?: { enabled?: boolean };
+  };
 }
 
 function UserManagement() {
@@ -200,6 +210,54 @@ export default function SettingsPage() {
               <input type="number" min="25" max="500" value={settings.blendedRate}
                 onChange={e => setSettings(s => s ? { ...s, blendedRate: parseFloat(e.target.value) || 95 } : s)}
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Estimation Defaults */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4" /> Estimation Defaults</CardTitle>
+          <CardDescription>Configure the project estimation engine</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-muted-foreground">Blended Rate ($/hr)</label>
+              <input type="number" min="50" max="300" step="5" value={settings.blendedRate ?? 95}
+                onChange={e => setSettings(s => s ? { ...s, blendedRate: parseFloat(e.target.value) || 95 } : s)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Requirements %</label>
+              <input type="number" min="0" max="30" value={settings.estimationConfig?.percentages?.requirements ?? 5}
+                onChange={e => setSettings(s => s ? { ...s, estimationConfig: { ...s.estimationConfig, percentages: { ...s.estimationConfig?.percentages, requirements: parseFloat(e.target.value) || 5 } } } : s)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Tech Design %</label>
+              <input type="number" min="0" max="30" value={settings.estimationConfig?.percentages?.technicalDesign ?? 5}
+                onChange={e => setSettings(s => s ? { ...s, estimationConfig: { ...s.estimationConfig, percentages: { ...s.estimationConfig?.percentages, technicalDesign: parseFloat(e.target.value) || 5 } } } : s)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Testing %</label>
+              <input type="number" min="0" max="60" value={settings.estimationConfig?.percentages?.testing ?? 33}
+                onChange={e => setSettings(s => s ? { ...s, estimationConfig: { ...s.estimationConfig, percentages: { ...s.estimationConfig?.percentages, testing: parseFloat(e.target.value) || 33 } } } : s)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Support %</label>
+              <input type="number" min="0" max="30" value={settings.estimationConfig?.percentages?.support ?? 10}
+                onChange={e => setSettings(s => s ? { ...s, estimationConfig: { ...s.estimationConfig, percentages: { ...s.estimationConfig?.percentages, support: parseFloat(e.target.value) || 10 } } } : s)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg bg-muted border border-border" />
+            </div>
+            <div className="flex items-center gap-2 self-end pb-2">
+              <input type="checkbox" checked={settings.estimationConfig?.sprintConsolidation?.enabled ?? true}
+                onChange={e => setSettings(s => s ? { ...s, estimationConfig: { ...s.estimationConfig, sprintConsolidation: { enabled: e.target.checked } } } : s)}
+                className="rounded border-border" />
+              <label className="text-xs text-muted-foreground">Sprint Consolidation</label>
             </div>
           </div>
         </CardContent>

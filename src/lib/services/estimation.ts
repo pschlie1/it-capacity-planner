@@ -1,5 +1,11 @@
-// Estimation Engine - ported from Estimator app
-// Calculates project hours, costs, timeline from dev hours input
+/**
+ * Estimation Engine - Ported from the Estimator app
+ * Calculates project estimates based on dev hours input
+ */
+
+// ============================================
+// Types
+// ============================================
 
 export interface EstimationConfig {
   percentages: {
@@ -10,21 +16,25 @@ export interface EstimationConfig {
     devOps: number;
     projectManagement: number;
   };
-  blendedRate: number;
   devOpsMaxHours: number;
-  capacity: {
-    maxWeeklyHours: number;
-    sprintWeeks: number;
+  blendedRate: number;
+  roundingThresholds: {
+    small: number; // hours threshold - below this round to 4hrs
+    large: number; // round to 8hrs for larger projects
   };
   teamSizing: {
     smallProject: { maxWeeks: number; developers: number };
     mediumProject: { maxWeeks: number; developers: number };
     largeProject: { developers: number };
   };
+  capacity: {
+    maxWeeklyHours: number;
+    sprintWeeks: number;
+  };
   projectSizeThresholds: {
-    micro: number;
-    small: number;
-    medium: number;
+    micro: { maxHours: number };
+    small: { maxHours: number };
+    medium: { maxHours: number };
   };
   roleFlexibility: {
     projectManagement: Record<string, { percentage: number; enabled: boolean }>;
@@ -34,10 +44,57 @@ export interface EstimationConfig {
     enabled: boolean;
     thresholdHours: number;
   };
-  roundingThresholds: {
-    small: number;
+}
+
+export interface PhaseBreakdown {
+  requirements: number;
+  technicalDesign: number;
+  development: number;
+  testing: number;
+  support: number;
+  devOps: number;
+  projectManagement: number;
+}
+
+export interface EstimationResult {
+  phases: PhaseBreakdown;
+  totalHours: number;
+  durationWeeks: number;
+  durationSprints: number;
+  teamSize: number;
+  testingModel: 'sequential' | 'hybrid' | 'parallel';
+  projectSize: 'micro' | 'small' | 'medium' | 'large';
+  capex: { total: number; percentage: number; phases: Array<{ phase: string; hours: number; cost: number }> };
+  opex: { total: number; percentage: number; phases: Array<{ phase: string; hours: number; cost: number }> };
+  totalCost: number;
+  costPerSprint: number;
+}
+
+export interface AggregateEstimation {
+  teams: Array<{
+    teamId: string;
+    teamName: string;
+    devHours: number;
+    estimate: EstimationResult;
+  }>;
+  totals: {
+    phases: PhaseBreakdown;
+    totalHours: number;
+    totalCost: number;
+    capexAmount: number;
+    opexAmount: number;
+    capexPercentage: number;
+    opexPercentage: number;
+    durationWeeks: number;
+    durationSprints: number;
+    teamSize: number;
+    testingModel: 'sequential' | 'hybrid' | 'parallel';
   };
 }
+
+// ============================================
+// Default Config
+// ============================================
 
 export const DEFAULT_ESTIMATION_CONFIG: EstimationConfig = {
   percentages: {
@@ -48,21 +105,25 @@ export const DEFAULT_ESTIMATION_CONFIG: EstimationConfig = {
     devOps: 5,
     projectManagement: 10,
   },
-  blendedRate: 95,
   devOpsMaxHours: 40,
-  capacity: {
-    maxWeeklyHours: 30,
-    sprintWeeks: 2,
+  blendedRate: 95,
+  roundingThresholds: {
+    small: 160,
+    large: 4,
   },
   teamSizing: {
     smallProject: { maxWeeks: 8, developers: 1 },
     mediumProject: { maxWeeks: 20, developers: 2.5 },
     largeProject: { developers: 3.5 },
   },
+  capacity: {
+    maxWeeklyHours: 30,
+    sprintWeeks: 2,
+  },
   projectSizeThresholds: {
-    micro: 80,
-    small: 240,
-    medium: 600,
+    micro: { maxHours: 80 },
+    small: { maxHours: 240 },
+    medium: { maxHours: 600 },
   },
   roleFlexibility: {
     projectManagement: {
@@ -82,335 +143,270 @@ export const DEFAULT_ESTIMATION_CONFIG: EstimationConfig = {
     enabled: true,
     thresholdHours: 60,
   },
-  roundingThresholds: {
-    small: 160,
-  },
 };
 
-export type ProjectSizeCategory = 'micro' | 'small' | 'medium' | 'large';
-export type TestingModelType = 'sequential' | 'hybrid' | 'parallel';
+// ============================================
+// Helpers
+// ============================================
 
-export interface PhaseBreakdown {
-  requirements: number;
-  technicalDesign: number;
-  development: number;
-  testing: number;
-  support: number;
-  devOps: number;
-  projectManagement: number;
-}
-
-export interface EstimationResult {
-  phases: PhaseBreakdown;
-  totalHours: number;
-  totalCost: number;
-  capexAmount: number;
-  opexAmount: number;
-  capexPercent: number;
-  opexPercent: number;
-  teamSize: number;
-  teamSizeExact: number;
-  projectSizeCategory: ProjectSizeCategory;
-  projectSizeLabel: string;
-  testingModel: TestingModelType;
-  estimatedWeeks: number;
-  devWeeks: number;
-  sprintConsolidated: boolean;
-  phaseDetails: PhaseDetail[];
-}
-
-export interface PhaseDetail {
-  name: string;
-  key: string;
-  hours: number;
-  cost: number;
-  category: 'CapEx' | 'OpEx';
-  weeks: number;
-}
-
-export interface AggregateEstimation {
-  teams: Array<{
-    teamId: string;
-    teamName: string;
-    devHours: number;
-    result: EstimationResult;
-  }>;
-  totalDevHours: number;
-  totalHours: number;
-  totalCost: number;
-  totalCapex: number;
-  totalOpex: number;
-  estimatedWeeks: number;
-  recommendedTeamSize: number;
-}
-
-// ---- Core Functions ----
-
-function getProjectSizeCategory(
+function getProjectSize(
   devHours: number,
   thresholds: EstimationConfig['projectSizeThresholds']
-): ProjectSizeCategory {
-  if (devHours <= thresholds.micro) return 'micro';
-  if (devHours <= thresholds.small) return 'small';
-  if (devHours <= thresholds.medium) return 'medium';
+): 'micro' | 'small' | 'medium' | 'large' {
+  if (devHours <= thresholds.micro.maxHours) return 'micro';
+  if (devHours <= thresholds.small.maxHours) return 'small';
+  if (devHours <= thresholds.medium.maxHours) return 'medium';
   return 'large';
-}
-
-function getProjectSizeLabel(category: ProjectSizeCategory): string {
-  const labels: Record<ProjectSizeCategory, string> = {
-    micro: 'Micro Project',
-    small: 'Small Project',
-    medium: 'Medium Project',
-    large: 'Large Project',
-  };
-  return labels[category];
-}
-
-function roundToNearest(hours: number, isSmallProject: boolean): number {
-  const roundTo = isSmallProject ? 4 : 8;
-  return Math.ceil(hours / roundTo) * roundTo;
-}
-
-function roundToSprintBoundary(weeks: number, sprintWeeks: number): number {
-  return Math.ceil(weeks / sprintWeeks) * sprintWeeks;
 }
 
 function getDynamicPercentage(
   role: 'projectManagement' | 'devOps',
-  category: ProjectSizeCategory,
+  size: string,
   config: EstimationConfig
 ): number {
-  const roleConfig = config.roleFlexibility[role][category];
-  if (!roleConfig || !roleConfig.enabled) return 0;
+  const roleConfig = config.roleFlexibility[role][size];
+  if (!roleConfig?.enabled) return 0;
   return roleConfig.percentage;
 }
 
-function calculateOptimalTeamSize(
-  devHours: number,
-  config: EstimationConfig
-): { exact: number; rounded: number } {
-  const singleDevWeeks = devHours / config.capacity.maxWeeklyHours;
-
-  let exact: number;
-  if (singleDevWeeks <= config.teamSizing.smallProject.maxWeeks) {
-    exact = config.teamSizing.smallProject.developers;
-  } else if (singleDevWeeks <= config.teamSizing.mediumProject.maxWeeks) {
-    exact = config.teamSizing.mediumProject.developers;
-  } else {
-    exact = config.teamSizing.largeProject.developers;
-  }
-
-  return { exact, rounded: Math.round(exact) || 1 };
+function roundHours(hours: number, totalDevHours: number, config: EstimationConfig): number {
+  if (hours <= 0) return 0;
+  const roundTo = totalDevHours <= config.roundingThresholds.small ? 4 : 8;
+  return Math.ceil(hours / roundTo) * roundTo;
 }
 
-function getTestingModel(
-  teamSize: number,
-  devWeeks: number
-): TestingModelType {
-  if (teamSize === 1 && devWeeks <= 8) return 'sequential';
-  if (teamSize <= 3) return 'hybrid';
+function getTestingModel(devHours: number): 'sequential' | 'hybrid' | 'parallel' {
+  if (devHours <= 160) return 'sequential';
+  if (devHours <= 400) return 'hybrid';
   return 'parallel';
 }
 
-// ---- Main Calculation ----
+// ============================================
+// Main Calculation
+// ============================================
 
 export function calculateProjectEstimate(
   devHours: number,
-  configOverrides?: Partial<EstimationConfig>
+  config: EstimationConfig = DEFAULT_ESTIMATION_CONFIG
 ): EstimationResult {
-  const config: EstimationConfig = {
-    ...DEFAULT_ESTIMATION_CONFIG,
-    ...configOverrides,
-    percentages: {
-      ...DEFAULT_ESTIMATION_CONFIG.percentages,
-      ...configOverrides?.percentages,
-    },
-    capacity: {
-      ...DEFAULT_ESTIMATION_CONFIG.capacity,
-      ...configOverrides?.capacity,
-    },
-    teamSizing: {
-      ...DEFAULT_ESTIMATION_CONFIG.teamSizing,
-      ...configOverrides?.teamSizing,
-    },
-    projectSizeThresholds: {
-      ...DEFAULT_ESTIMATION_CONFIG.projectSizeThresholds,
-      ...configOverrides?.projectSizeThresholds,
-    },
-    roleFlexibility: {
-      ...DEFAULT_ESTIMATION_CONFIG.roleFlexibility,
-      ...configOverrides?.roleFlexibility,
-    },
-    sprintConsolidation: {
-      ...DEFAULT_ESTIMATION_CONFIG.sprintConsolidation,
-      ...configOverrides?.sprintConsolidation,
-    },
-    roundingThresholds: {
-      ...DEFAULT_ESTIMATION_CONFIG.roundingThresholds,
-      ...configOverrides?.roundingThresholds,
-    },
-  };
-
   if (devHours <= 0) {
-    return emptyResult();
+    return {
+      phases: { requirements: 0, technicalDesign: 0, development: 0, testing: 0, support: 0, devOps: 0, projectManagement: 0 },
+      totalHours: 0, durationWeeks: 0, durationSprints: 0, teamSize: 0,
+      testingModel: 'sequential', projectSize: 'micro',
+      capex: { total: 0, percentage: 0, phases: [] },
+      opex: { total: 0, percentage: 0, phases: [] },
+      totalCost: 0, costPerSprint: 0,
+    };
   }
 
-  const isSmall = devHours <= config.roundingThresholds.small;
-  const sizeCategory = getProjectSizeCategory(devHours, config.projectSizeThresholds);
-  const sizeLabel = getProjectSizeLabel(sizeCategory);
+  const projectSize = getProjectSize(devHours, config.projectSizeThresholds);
 
   // Calculate phase hours
-  const requirementsHours = roundToNearest(devHours * (config.percentages.requirements / 100), isSmall);
-  const technicalDesignHours = roundToNearest(devHours * (config.percentages.technicalDesign / 100), isSmall);
-  const testingHours = roundToNearest(devHours * (config.percentages.testing / 100), isSmall);
-  const supportHours = roundToNearest(devHours * (config.percentages.support / 100), isSmall);
+  const requirements = roundHours(devHours * (config.percentages.requirements / 100), devHours, config);
+  const technicalDesign = roundHours(devHours * (config.percentages.technicalDesign / 100), devHours, config);
+  const development = roundHours(devHours, devHours, config);
+  const testing = roundHours(devHours * (config.percentages.testing / 100), devHours, config);
+  const support = roundHours(devHours * (config.percentages.support / 100), devHours, config);
 
-  const devOpsPct = getDynamicPercentage('devOps', sizeCategory, config);
-  const pmPct = getDynamicPercentage('projectManagement', sizeCategory, config);
+  // Dynamic PM and DevOps based on project size
+  const pmPct = getDynamicPercentage('projectManagement', projectSize, config);
+  const devOpsPct = getDynamicPercentage('devOps', projectSize, config);
 
-  const devOpsHours = Math.min(
-    roundToNearest(devHours * (devOpsPct / 100), isSmall),
-    config.devOpsMaxHours
-  );
-  const pmHours = roundToNearest(devHours * (pmPct / 100), isSmall);
+  let projectManagement = roundHours(devHours * (pmPct / 100), devHours, config);
+  let devOps = roundHours(devHours * (devOpsPct / 100), devHours, config);
 
-  // Team sizing
-  const { exact: teamSizeExact, rounded: teamSize } = calculateOptimalTeamSize(devHours, config);
-
-  // Development duration
-  const rawDevWeeks = devHours / (teamSizeExact * config.capacity.maxWeeklyHours);
-  const devWeeks = roundToSprintBoundary(rawDevWeeks, config.capacity.sprintWeeks);
-
-  // Testing model
-  const testModel = getTestingModel(teamSize, devWeeks);
-
-  // Sprint consolidation
-  const consolidated = config.sprintConsolidation.enabled &&
-    (requirementsHours + technicalDesignHours) <= config.sprintConsolidation.thresholdHours;
-
-  // Estimate total weeks
-  const reqDesignWeeks = consolidated
-    ? roundToSprintBoundary(
-        Math.ceil((requirementsHours + technicalDesignHours) / 8) / 5,
-        config.capacity.sprintWeeks
-      )
-    : roundToSprintBoundary(Math.ceil(requirementsHours / 8) / 5, config.capacity.sprintWeeks) +
-      roundToSprintBoundary(Math.ceil(technicalDesignHours / 8) / 5, config.capacity.sprintWeeks);
-
-  let testingWeeks = 0;
-  if (testModel === 'sequential') {
-    testingWeeks = roundToSprintBoundary(Math.ceil(testingHours / 8) / 5, config.capacity.sprintWeeks);
-  } else if (testModel === 'hybrid') {
-    testingWeeks = 2; // UAT period beyond dev
-  } else {
-    testingWeeks = 2; // UAT period beyond dev
+  // DevOps max cap
+  if (devOps > config.devOpsMaxHours) {
+    devOps = config.devOpsMaxHours;
   }
 
-  const supportWeeks = roundToSprintBoundary(
-    Math.ceil(supportHours / 8) / 5,
-    config.capacity.sprintWeeks
-  );
-
-  const totalWeeks = reqDesignWeeks + devWeeks + testingWeeks + supportWeeks;
-
-  // Totals
   const phases: PhaseBreakdown = {
-    requirements: requirementsHours,
-    technicalDesign: technicalDesignHours,
-    development: devHours,
-    testing: testingHours,
-    support: supportHours,
-    devOps: devOpsHours,
-    projectManagement: pmHours,
+    requirements,
+    technicalDesign,
+    development,
+    testing,
+    support,
+    devOps,
+    projectManagement,
   };
 
-  const totalHours = Object.values(phases).reduce((sum, h) => sum + h, 0);
-  const totalCost = totalHours * config.blendedRate;
+  const totalHours = requirements + technicalDesign + development + testing + support + devOps + projectManagement;
 
-  // CapEx/OpEx (Requirements + PM = OpEx, rest = CapEx)
-  const opexAmount = (requirementsHours + pmHours) * config.blendedRate;
-  const capexAmount = totalCost - opexAmount;
+  // Team sizing
+  let teamSize: number;
+  const rawWeeks = totalHours / config.capacity.maxWeeklyHours;
+  if (rawWeeks <= config.teamSizing.smallProject.maxWeeks) {
+    teamSize = config.teamSizing.smallProject.developers;
+  } else if (rawWeeks <= config.teamSizing.mediumProject.maxWeeks) {
+    teamSize = config.teamSizing.mediumProject.developers;
+  } else {
+    teamSize = config.teamSizing.largeProject.developers;
+  }
 
-  const phaseDetails: PhaseDetail[] = [
-    { name: 'Requirements', key: 'requirements', hours: requirementsHours, cost: requirementsHours * config.blendedRate, category: 'OpEx', weeks: reqDesignWeeks },
-    { name: 'Technical Design', key: 'technicalDesign', hours: technicalDesignHours, cost: technicalDesignHours * config.blendedRate, category: 'CapEx', weeks: consolidated ? 0 : reqDesignWeeks },
-    { name: 'Development', key: 'development', hours: devHours, cost: devHours * config.blendedRate, category: 'CapEx', weeks: devWeeks },
-    { name: 'Testing', key: 'testing', hours: testingHours, cost: testingHours * config.blendedRate, category: 'CapEx', weeks: testingWeeks },
-    { name: 'Post-Deploy Support', key: 'support', hours: supportHours, cost: supportHours * config.blendedRate, category: 'CapEx', weeks: supportWeeks },
-    { name: 'DevOps', key: 'devOps', hours: devOpsHours, cost: devOpsHours * config.blendedRate, category: 'CapEx', weeks: 0 },
-    { name: 'Project Management', key: 'projectManagement', hours: pmHours, cost: pmHours * config.blendedRate, category: 'OpEx', weeks: 0 },
+  // Duration calculation
+  const durationWeeks = Math.ceil(totalHours / (teamSize * config.capacity.maxWeeklyHours));
+  const sprintWeeks = config.capacity.sprintWeeks;
+  const durationSprints = Math.ceil(durationWeeks / sprintWeeks);
+  const adjustedWeeks = durationSprints * sprintWeeks; // Round to sprint boundary
+
+  const testingModel = getTestingModel(devHours);
+  const blendedRate = config.blendedRate;
+
+  // CapEx/OpEx split
+  // OpEx: Requirements + PM
+  // CapEx: everything else
+  const opexPhases: Array<{ phase: string; hours: number; cost: number }> = [];
+  const capexPhases: Array<{ phase: string; hours: number; cost: number }> = [];
+
+  const phaseCategories: Array<{ key: keyof PhaseBreakdown; label: string; type: 'opex' | 'capex' }> = [
+    { key: 'requirements', label: 'Requirements', type: 'opex' },
+    { key: 'technicalDesign', label: 'Technical Design', type: 'capex' },
+    { key: 'development', label: 'Development', type: 'capex' },
+    { key: 'testing', label: 'Testing', type: 'capex' },
+    { key: 'support', label: 'Hypercare Support', type: 'capex' },
+    { key: 'devOps', label: 'DevOps', type: 'capex' },
+    { key: 'projectManagement', label: 'Project Management', type: 'opex' },
   ];
+
+  let opexTotal = 0;
+  let capexTotal = 0;
+
+  for (const pc of phaseCategories) {
+    const hours = phases[pc.key];
+    if (hours <= 0) continue;
+    const cost = hours * blendedRate;
+    const entry = { phase: pc.label, hours, cost };
+    if (pc.type === 'opex') {
+      opexPhases.push(entry);
+      opexTotal += cost;
+    } else {
+      capexPhases.push(entry);
+      capexTotal += cost;
+    }
+  }
+
+  const totalCost = opexTotal + capexTotal;
+  const costPerSprint = durationSprints > 0 ? totalCost / durationSprints : 0;
 
   return {
     phases,
     totalHours,
-    totalCost,
-    capexAmount,
-    opexAmount,
-    capexPercent: totalCost > 0 ? (capexAmount / totalCost) * 100 : 0,
-    opexPercent: totalCost > 0 ? (opexAmount / totalCost) * 100 : 0,
+    durationWeeks: adjustedWeeks,
+    durationSprints,
     teamSize,
-    teamSizeExact,
-    projectSizeCategory: sizeCategory,
-    projectSizeLabel: sizeLabel,
-    testingModel: testModel,
-    estimatedWeeks: totalWeeks,
-    devWeeks,
-    sprintConsolidated: consolidated,
-    phaseDetails,
+    testingModel,
+    projectSize,
+    capex: {
+      total: capexTotal,
+      percentage: totalCost > 0 ? (capexTotal / totalCost) * 100 : 0,
+      phases: capexPhases,
+    },
+    opex: {
+      total: opexTotal,
+      percentage: totalCost > 0 ? (opexTotal / totalCost) * 100 : 0,
+      phases: opexPhases,
+    },
+    totalCost,
+    costPerSprint,
   };
 }
+
+// ============================================
+// Aggregate Estimation (across teams)
+// ============================================
 
 export function calculateAggregateEstimate(
   teamEstimates: Array<{ teamId: string; teamName: string; devHours: number }>,
-  configOverrides?: Partial<EstimationConfig>
+  config: EstimationConfig = DEFAULT_ESTIMATION_CONFIG
 ): AggregateEstimation {
-  const teams = teamEstimates
-    .filter((t) => t.devHours > 0)
-    .map((t) => ({
-      teamId: t.teamId,
-      teamName: t.teamName,
-      devHours: t.devHours,
-      result: calculateProjectEstimate(t.devHours, configOverrides),
-    }));
+  const teams = teamEstimates.map((te) => ({
+    teamId: te.teamId,
+    teamName: te.teamName,
+    devHours: te.devHours,
+    estimate: calculateProjectEstimate(te.devHours, config),
+  }));
 
-  const totalDevHours = teams.reduce((s, t) => s + t.devHours, 0);
-  const totalHours = teams.reduce((s, t) => s + t.result.totalHours, 0);
-  const totalCost = teams.reduce((s, t) => s + t.result.totalCost, 0);
-  const totalCapex = teams.reduce((s, t) => s + t.result.capexAmount, 0);
-  const totalOpex = teams.reduce((s, t) => s + t.result.opexAmount, 0);
-  const estimatedWeeks = teams.length > 0 ? Math.max(...teams.map((t) => t.result.estimatedWeeks)) : 0;
-  const recommendedTeamSize = teams.reduce((s, t) => s + t.result.teamSize, 0);
+  // Aggregate totals
+  const totalPhases: PhaseBreakdown = {
+    requirements: 0, technicalDesign: 0, development: 0,
+    testing: 0, support: 0, devOps: 0, projectManagement: 0,
+  };
+
+  let totalHours = 0;
+  let totalCost = 0;
+  let capexAmount = 0;
+  let opexAmount = 0;
+  let maxWeeks = 0;
+  let totalDevHours = 0;
+
+  for (const t of teams) {
+    const e = t.estimate;
+    totalPhases.requirements += e.phases.requirements;
+    totalPhases.technicalDesign += e.phases.technicalDesign;
+    totalPhases.development += e.phases.development;
+    totalPhases.testing += e.phases.testing;
+    totalPhases.support += e.phases.support;
+    totalPhases.devOps += e.phases.devOps;
+    totalPhases.projectManagement += e.phases.projectManagement;
+    totalHours += e.totalHours;
+    totalCost += e.totalCost;
+    capexAmount += e.capex.total;
+    opexAmount += e.opex.total;
+    if (e.durationWeeks > maxWeeks) maxWeeks = e.durationWeeks;
+    totalDevHours += t.devHours;
+  }
+
+  const sprintWeeks = config.capacity.sprintWeeks;
+  const durationSprints = Math.ceil(maxWeeks / sprintWeeks);
+  const adjustedWeeks = durationSprints * sprintWeeks;
+
+  // Aggregate team size and testing model from total dev hours
+  const aggregateEstimate = calculateProjectEstimate(totalDevHours, config);
 
   return {
     teams,
-    totalDevHours,
-    totalHours,
-    totalCost,
-    totalCapex,
-    totalOpex,
-    estimatedWeeks,
-    recommendedTeamSize,
+    totals: {
+      phases: totalPhases,
+      totalHours,
+      totalCost,
+      capexAmount,
+      opexAmount,
+      capexPercentage: totalCost > 0 ? (capexAmount / totalCost) * 100 : 0,
+      opexPercentage: totalCost > 0 ? (opexAmount / totalCost) * 100 : 0,
+      durationWeeks: adjustedWeeks,
+      durationSprints,
+      teamSize: aggregateEstimate.teamSize,
+      testingModel: aggregateEstimate.testingModel,
+    },
   };
 }
 
-function emptyResult(): EstimationResult {
-  return {
-    phases: { requirements: 0, technicalDesign: 0, development: 0, testing: 0, support: 0, devOps: 0, projectManagement: 0 },
-    totalHours: 0,
-    totalCost: 0,
-    capexAmount: 0,
-    opexAmount: 0,
-    capexPercent: 0,
-    opexPercent: 0,
-    teamSize: 0,
-    teamSizeExact: 0,
-    projectSizeCategory: 'micro',
-    projectSizeLabel: 'No Estimate',
-    testingModel: 'sequential',
-    estimatedWeeks: 0,
-    devWeeks: 0,
-    sprintConsolidated: false,
-    phaseDetails: [],
-  };
+// ============================================
+// Config Merge Helper
+// ============================================
+
+export function mergeEstimationConfig(
+  orgConfig: Record<string, unknown>,
+  projectConfig: Record<string, unknown>
+): EstimationConfig {
+  const base = { ...DEFAULT_ESTIMATION_CONFIG };
+
+  // Deep merge org config
+  if (orgConfig && typeof orgConfig === 'object') {
+    Object.assign(base, orgConfig);
+    if (orgConfig.percentages && typeof orgConfig.percentages === 'object') {
+      base.percentages = { ...base.percentages, ...(orgConfig.percentages as Record<string, number>) };
+    }
+  }
+
+  // Deep merge project config (overrides org)
+  if (projectConfig && typeof projectConfig === 'object') {
+    Object.assign(base, projectConfig);
+    if (projectConfig.percentages && typeof projectConfig.percentages === 'object') {
+      base.percentages = { ...base.percentages, ...(projectConfig.percentages as Record<string, number>) };
+    }
+  }
+
+  return base;
 }

@@ -1,339 +1,360 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Save, Calculator, DollarSign, Clock, Users, BarChart3, ArrowLeft, TrendingUp } from 'lucide-react';
-
-interface Team {
-  id: string;
-  name: string;
-}
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import {
+  Calculator, Save, DollarSign, Clock, Users, TrendingUp,
+  ArrowLeft, RefreshCw, CheckCircle2,
+} from 'lucide-react';
 
 interface TeamEstimateRow {
+  id: string;
   teamId: string;
   teamName: string;
   devHours: number;
-  confidence: string;
-}
-
-interface PhaseDetail {
-  name: string;
-  key: string;
-  hours: number;
-  cost: number;
-  category: 'CapEx' | 'OpEx';
-}
-
-interface TeamResult {
-  teamId: string;
-  teamName: string;
-  devHours: number;
-  result: {
-    phases: Record<string, number>;
-    totalHours: number;
-    totalCost: number;
-    capexAmount: number;
-    opexAmount: number;
-    capexPercent: number;
-    opexPercent: number;
-    teamSize: number;
-    projectSizeLabel: string;
-    testingModel: string;
-    estimatedWeeks: number;
-    phaseDetails: PhaseDetail[];
+  phases: {
+    requirements: number;
+    technicalDesign: number;
+    development: number;
+    testing: number;
+    support: number;
+    devOps: number;
+    projectManagement: number;
   };
-}
-
-interface AggregateData {
-  teams: TeamResult[];
-  totalDevHours: number;
   totalHours: number;
   totalCost: number;
-  totalCapex: number;
-  totalOpex: number;
-  estimatedWeeks: number;
-  recommendedTeamSize: number;
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+interface EstimationData {
+  project: {
+    id: string;
+    name: string;
+    workflowStatus: string;
+    estimatedCost: number | null;
+  };
+  estimation: {
+    teams: Array<{
+      teamId: string;
+      teamName: string;
+      devHours: number;
+      estimate: {
+        phases: Record<string, number>;
+        totalHours: number;
+        totalCost: number;
+        durationWeeks: number;
+        durationSprints: number;
+        teamSize: number;
+        testingModel: string;
+        projectSize: string;
+        capex: { total: number; percentage: number };
+        opex: { total: number; percentage: number };
+      };
+    }>;
+    totals: {
+      phases: Record<string, number>;
+      totalHours: number;
+      totalCost: number;
+      capexAmount: number;
+      opexAmount: number;
+      capexPercentage: number;
+      opexPercentage: number;
+      durationWeeks: number;
+      durationSprints: number;
+      teamSize: number;
+      testingModel: string;
+    };
+  };
 }
 
-export default function EstimationWorkspace({
-  projectId,
-  projectName,
-  teams,
-  onBack,
-}: {
+interface Props {
   projectId: string;
-  projectName: string;
-  teams: Team[];
   onBack: () => void;
-}) {
-  const [estimates, setEstimates] = useState<TeamEstimateRow[]>([]);
-  const [aggregate, setAggregate] = useState<AggregateData | null>(null);
+}
+
+const WORKFLOW_LABELS: Record<string, string> = {
+  submitted: 'Submitted',
+  estimating: 'Estimating',
+  estimated: 'Estimated',
+  cost_review: 'Cost Review',
+  approved: 'Approved',
+  prioritized: 'Prioritized',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+};
+
+const WORKFLOW_COLORS: Record<string, string> = {
+  submitted: 'bg-slate-500/20 text-slate-400',
+  estimating: 'bg-blue-500/20 text-blue-400',
+  estimated: 'bg-purple-500/20 text-purple-400',
+  cost_review: 'bg-amber-500/20 text-amber-400',
+  approved: 'bg-green-500/20 text-green-400',
+  prioritized: 'bg-cyan-500/20 text-cyan-400',
+  in_progress: 'bg-emerald-500/20 text-emerald-400',
+  completed: 'bg-green-600/20 text-green-300',
+};
+
+const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+
+export default function EstimationWorkspace({ projectId, onBack }: Props) {
+  const [data, setData] = useState<EstimationData | null>(null);
+  const [devHoursInputs, setDevHoursInputs] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchEstimate = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/estimate`);
-      if (!res.ok) return;
-      const data = await res.json();
-
-      const rows: TeamEstimateRow[] = teams.map((team) => {
-        const existing = data.teamEstimates?.find((te: { teamId: string }) => te.teamId === team.id);
-        return {
-          teamId: team.id,
-          teamName: team.name,
-          devHours: existing?.devHours ?? 0,
-          confidence: existing?.confidence ?? 'medium',
-        };
-      });
-      setEstimates(rows);
-      if (data.aggregate) setAggregate(data.aggregate);
-    } catch {
-      // Init with empty rows
-      setEstimates(teams.map((t) => ({ teamId: t.id, teamName: t.name, devHours: 0, confidence: 'medium' })));
+  const fetchEstimation = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/projects/${projectId}/estimate`);
+    if (res.ok) {
+      const d = await res.json() as EstimationData;
+      setData(d);
+      // Initialize inputs from fetched data
+      const inputs: Record<string, number> = {};
+      for (const t of d.estimation.teams) {
+        inputs[t.teamId] = t.devHours;
+      }
+      setDevHoursInputs(inputs);
     }
     setLoading(false);
-  }, [projectId, teams]);
+  }, [projectId]);
 
-  useEffect(() => { fetchEstimate(); }, [fetchEstimate]);
+  useEffect(() => { fetchEstimation(); }, [fetchEstimation]);
 
-  const updateDevHours = (teamId: string, hours: number) => {
-    setEstimates((prev) => prev.map((e) => (e.teamId === teamId ? { ...e, devHours: hours } : e)));
-    setSaved(false);
-  };
-
-  const updateConfidence = (teamId: string, confidence: string) => {
-    setEstimates((prev) => prev.map((e) => (e.teamId === teamId ? { ...e, confidence } : e)));
-    setSaved(false);
-  };
-
-  const saveEstimates = async () => {
+  const handleSave = async () => {
+    if (!data) return;
     setSaving(true);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/estimate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teamEstimates: estimates.map((e) => ({
-            teamId: e.teamId,
-            devHours: e.devHours,
-            confidence: e.confidence,
-          })),
+
+    // Find team estimate IDs from the project data
+    const res = await fetch(`/api/projects/${projectId}/estimate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        teamEstimates: data.estimation.teams.map((t) => {
+          // We need to look up the teamEstimate ID - refetch project
+          return {
+            teamEstimateId: t.teamId, // Will be resolved server-side
+            devHours: devHoursInputs[t.teamId] ?? t.devHours,
+          };
         }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.aggregate) setAggregate(data.aggregate);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
-      }
-    } catch { /* ignore */ }
+      }),
+    });
+
+    if (res.ok) {
+      await fetchEstimation();
+    }
     setSaving(false);
   };
 
-  const totalDevHours = estimates.reduce((s, e) => s + e.devHours, 0);
+  if (loading || !data) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
-  if (loading) return <p className="text-muted-foreground">Loading estimation...</p>;
+  const { project, estimation } = data;
+  const { totals } = estimation;
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 rounded hover:bg-zinc-800 transition-colors">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div>
-          <h2 className="text-xl font-bold">{projectName}</h2>
-          <p className="text-sm text-muted-foreground">Estimation Workspace</p>
-        </div>
-      </div>
-
-      {/* Team Dev Hours Input */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Calculator className="h-4 w-4" />
-            Team Development Hours
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {estimates.map((est) => (
-              <div key={est.teamId} className="flex items-center gap-4">
-                <span className="w-40 text-sm font-medium truncate">{est.teamName}</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={8}
-                  value={est.devHours || ''}
-                  onChange={(e) => updateDevHours(est.teamId, Number(e.target.value) || 0)}
-                  placeholder="Dev hours"
-                  className="w-28 px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm focus:border-blue-500 focus:outline-none"
-                />
-                <select
-                  value={est.confidence}
-                  onChange={(e) => updateConfidence(est.teamId, e.target.value)}
-                  className="px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="high">High confidence</option>
-                  <option value="medium">Medium confidence</option>
-                  <option value="low">Low confidence</option>
-                </select>
-                {est.devHours > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {est.devHours <= 80 ? 'Micro' : est.devHours <= 240 ? 'Small' : est.devHours <= 600 ? 'Medium' : 'Large'}
-                  </span>
-                )}
-              </div>
-            ))}
-            <div className="flex items-center gap-4 pt-2 border-t border-zinc-800">
-              <span className="w-40 text-sm font-bold">Total</span>
-              <span className="w-28 text-sm font-bold">{totalDevHours} hrs</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-2 rounded-lg hover:bg-muted">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-primary" />
+              {project.name}
+            </h2>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`px-2 py-0.5 rounded text-xs ${WORKFLOW_COLORS[project.workflowStatus] || 'bg-muted'}`}>
+                {WORKFLOW_LABELS[project.workflowStatus] || project.workflowStatus}
+              </span>
             </div>
           </div>
-          <button
-            onClick={saveEstimates}
-            disabled={saving}
-            className="mt-4 flex items-center gap-2 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? 'Saving...' : saved ? 'Saved!' : 'Calculate & Save'}
-          </button>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save & Recalculate
+        </button>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <MiniKPI icon={<Clock className="w-4 h-4" />} label="Duration" value={`${totals.durationWeeks}w`} sub={`${totals.durationSprints} sprints`} color="text-blue-400" />
+        <MiniKPI icon={<Users className="w-4 h-4" />} label="Team Size" value={`${totals.teamSize}`} sub="recommended" color="text-purple-400" />
+        <MiniKPI icon={<TrendingUp className="w-4 h-4" />} label="Total Hours" value={`${totals.totalHours}`} color="text-cyan-400" />
+        <MiniKPI icon={<DollarSign className="w-4 h-4" />} label="Total Cost" value={fmt(totals.totalCost)} color="text-green-400" />
+        <MiniKPI icon={<DollarSign className="w-4 h-4" />} label="CapEx" value={fmt(totals.capexAmount)} sub={`${totals.capexPercentage.toFixed(0)}%`} color="text-amber-400" />
+        <MiniKPI icon={<DollarSign className="w-4 h-4" />} label="OpEx" value={fmt(totals.opexAmount)} sub={`${totals.opexPercentage.toFixed(0)}%`} color="text-red-400" />
+      </div>
+
+      {/* Team Estimates Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Team Dev Hours Input</CardTitle>
+          <CardDescription>Enter development hours per team. All other phases are auto-calculated.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 px-2 text-muted-foreground font-medium">Team</th>
+                  <th className="text-left py-2 px-2 text-muted-foreground font-medium">Dev Hours</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">Req</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">Design</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">Dev</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">Test</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">Support</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">DevOps</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">PM</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">Total</th>
+                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estimation.teams.map((t) => (
+                  <tr key={t.teamId} className="border-b border-border/50 hover:bg-muted/30">
+                    <td className="py-2 px-2 font-medium">{t.teamName}</td>
+                    <td className="py-2 px-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="4"
+                        value={devHoursInputs[t.teamId] ?? t.devHours}
+                        onChange={(e) => setDevHoursInputs((prev) => ({
+                          ...prev,
+                          [t.teamId]: parseFloat(e.target.value) || 0,
+                        }))}
+                        className="w-20 px-2 py-1 text-xs rounded bg-muted border border-border focus:ring-1 focus:ring-primary"
+                      />
+                    </td>
+                    <td className="py-2 px-2 text-right text-muted-foreground">{t.estimate.phases.requirements}</td>
+                    <td className="py-2 px-2 text-right text-muted-foreground">{t.estimate.phases.technicalDesign}</td>
+                    <td className="py-2 px-2 text-right text-muted-foreground">{t.estimate.phases.development}</td>
+                    <td className="py-2 px-2 text-right text-muted-foreground">{t.estimate.phases.testing}</td>
+                    <td className="py-2 px-2 text-right text-muted-foreground">{t.estimate.phases.support}</td>
+                    <td className="py-2 px-2 text-right text-muted-foreground">{t.estimate.phases.devOps}</td>
+                    <td className="py-2 px-2 text-right text-muted-foreground">{t.estimate.phases.projectManagement}</td>
+                    <td className="py-2 px-2 text-right font-medium">{t.estimate.totalHours}</td>
+                    <td className="py-2 px-2 text-right font-medium text-green-400">{fmt(t.estimate.totalCost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-medium">
+                  <td className="py-2 px-2">Totals</td>
+                  <td className="py-2 px-2"></td>
+                  <td className="py-2 px-2 text-right">{totals.phases.requirements}</td>
+                  <td className="py-2 px-2 text-right">{totals.phases.technicalDesign}</td>
+                  <td className="py-2 px-2 text-right">{totals.phases.development}</td>
+                  <td className="py-2 px-2 text-right">{totals.phases.testing}</td>
+                  <td className="py-2 px-2 text-right">{totals.phases.support}</td>
+                  <td className="py-2 px-2 text-right">{totals.phases.devOps}</td>
+                  <td className="py-2 px-2 text-right">{totals.phases.projectManagement}</td>
+                  <td className="py-2 px-2 text-right">{totals.totalHours}</td>
+                  <td className="py-2 px-2 text-right text-green-400">{fmt(totals.totalCost)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Aggregate Results */}
-      {aggregate && aggregate.totalHours > 0 && (
-        <>
-          {/* Summary KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card className="p-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <DollarSign className="h-3 w-3" /> Total Cost
+      {/* Cost Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* CapEx/OpEx Split */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-green-400" /> CapEx / OpEx Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Visual bar */}
+            <div className="h-6 rounded-full overflow-hidden flex mb-4">
+              <div className="bg-amber-500 h-full flex items-center justify-center text-[10px] font-medium text-white"
+                   style={{ width: `${totals.capexPercentage}%` }}>
+                {totals.capexPercentage > 10 && `CapEx ${totals.capexPercentage.toFixed(0)}%`}
               </div>
-              <div className="text-xl font-bold">{formatCurrency(aggregate.totalCost)}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <Clock className="h-3 w-3" /> Duration
+              <div className="bg-blue-500 h-full flex items-center justify-center text-[10px] font-medium text-white"
+                   style={{ width: `${totals.opexPercentage}%` }}>
+                {totals.opexPercentage > 10 && `OpEx ${totals.opexPercentage.toFixed(0)}%`}
               </div>
-              <div className="text-xl font-bold">{aggregate.estimatedWeeks} weeks</div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <Users className="h-3 w-3" /> Team Size
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">CapEx (Capitalizable)</p>
+                <p className="text-xl font-bold text-amber-400">{fmt(totals.capexAmount)}</p>
+                <p className="text-[10px] text-muted-foreground">Design, Dev, Testing, Support, DevOps</p>
               </div>
-              <div className="text-xl font-bold">{aggregate.recommendedTeamSize} people</div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <BarChart3 className="h-3 w-3" /> Total Hours
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">OpEx (Operating)</p>
+                <p className="text-xl font-bold text-blue-400">{fmt(totals.opexAmount)}</p>
+                <p className="text-[10px] text-muted-foreground">Requirements, PM</p>
               </div>
-              <div className="text-xl font-bold">{aggregate.totalHours.toLocaleString()}</div>
-            </Card>
-          </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* CapEx / OpEx */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" /> CapEx / OpEx Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-6">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">CapEx</div>
-                  <div className="text-lg font-bold text-blue-400">{formatCurrency(aggregate.totalCapex)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {aggregate.totalCost > 0 ? Math.round((aggregate.totalCapex / aggregate.totalCost) * 100) : 0}%
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">OpEx</div>
-                  <div className="text-lg font-bold text-amber-400">{formatCurrency(aggregate.totalOpex)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {aggregate.totalCost > 0 ? Math.round((aggregate.totalOpex / aggregate.totalCost) * 100) : 0}%
-                  </div>
-                </div>
+        {/* Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-primary" /> Estimation Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Testing Model</span>
+                <span className="font-medium capitalize">{totals.testingModel}</span>
               </div>
-              <div className="mt-3 h-3 rounded-full bg-zinc-800 overflow-hidden flex">
-                <div
-                  className="bg-blue-500 h-full"
-                  style={{ width: `${aggregate.totalCost > 0 ? (aggregate.totalCapex / aggregate.totalCost) * 100 : 0}%` }}
-                />
-                <div
-                  className="bg-amber-500 h-full"
-                  style={{ width: `${aggregate.totalCost > 0 ? (aggregate.totalOpex / aggregate.totalCost) * 100 : 0}%` }}
-                />
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Duration</span>
+                <span className="font-medium">{totals.durationWeeks} weeks ({totals.durationSprints} sprints)</span>
               </div>
-              <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> CapEx (Design, Dev, Testing, DevOps, Support)</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> OpEx (Requirements, PM)</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Recommended Team Size</span>
+                <span className="font-medium">{totals.teamSize} developers</span>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Per-Team Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Team Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-800 text-xs text-muted-foreground">
-                      <th className="text-left py-2 pr-4">Team</th>
-                      <th className="text-right px-2">Dev Hrs</th>
-                      <th className="text-right px-2">Req</th>
-                      <th className="text-right px-2">Design</th>
-                      <th className="text-right px-2">Testing</th>
-                      <th className="text-right px-2">Support</th>
-                      <th className="text-right px-2">DevOps</th>
-                      <th className="text-right px-2">PM</th>
-                      <th className="text-right px-2 font-bold">Total</th>
-                      <th className="text-right pl-2">Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {aggregate.teams.map((t) => (
-                      <tr key={t.teamId} className="border-b border-zinc-800/50">
-                        <td className="py-2 pr-4 font-medium">{t.teamName}</td>
-                        <td className="text-right px-2 text-blue-400">{t.devHours}</td>
-                        <td className="text-right px-2">{t.result.phases.requirements}</td>
-                        <td className="text-right px-2">{t.result.phases.technicalDesign}</td>
-                        <td className="text-right px-2">{t.result.phases.testing}</td>
-                        <td className="text-right px-2">{t.result.phases.support}</td>
-                        <td className="text-right px-2">{t.result.phases.devOps}</td>
-                        <td className="text-right px-2">{t.result.phases.projectManagement}</td>
-                        <td className="text-right px-2 font-bold">{t.result.totalHours}</td>
-                        <td className="text-right pl-2 text-emerald-400">{formatCurrency(t.result.totalCost)}</td>
-                      </tr>
-                    ))}
-                    <tr className="font-bold border-t border-zinc-700">
-                      <td className="py-2 pr-4">Total</td>
-                      <td className="text-right px-2 text-blue-400">{aggregate.totalDevHours}</td>
-                      <td className="text-right px-2">{aggregate.teams.reduce((s, t) => s + t.result.phases.requirements, 0)}</td>
-                      <td className="text-right px-2">{aggregate.teams.reduce((s, t) => s + t.result.phases.technicalDesign, 0)}</td>
-                      <td className="text-right px-2">{aggregate.teams.reduce((s, t) => s + t.result.phases.testing, 0)}</td>
-                      <td className="text-right px-2">{aggregate.teams.reduce((s, t) => s + t.result.phases.support, 0)}</td>
-                      <td className="text-right px-2">{aggregate.teams.reduce((s, t) => s + t.result.phases.devOps, 0)}</td>
-                      <td className="text-right px-2">{aggregate.teams.reduce((s, t) => s + t.result.phases.projectManagement, 0)}</td>
-                      <td className="text-right px-2">{aggregate.totalHours}</td>
-                      <td className="text-right pl-2 text-emerald-400">{formatCurrency(aggregate.totalCost)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Hours</span>
+                <span className="font-medium">{totals.totalHours}h</span>
               </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
+              <div className="flex justify-between text-sm border-t border-border pt-2">
+                <span className="text-muted-foreground font-medium">Total Cost</span>
+                <span className="font-bold text-green-400 text-lg">{fmt(totals.totalCost)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
+  );
+}
+
+function MiniKPI({ icon, label, value, sub, color }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string; color: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-3 pb-3">
+        <div className="flex items-center gap-2">
+          <div className={`${color} opacity-60`}>{icon}</div>
+          <div>
+            <p className="text-[10px] text-muted-foreground">{label}</p>
+            <p className={`text-lg font-bold ${color}`}>{value}</p>
+            {sub && <p className="text-[9px] text-muted-foreground">{sub}</p>}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -98,6 +98,55 @@ async function main() {
     })
   }
 
+  // Set blended rate on org
+  console.log('Setting blended rate and estimation config...')
+  await prisma.organization.update({
+    where: { id: org.id },
+    data: {
+      blendedRate: 95,
+      estimationConfig: {
+        percentages: { requirements: 5, technicalDesign: 5, testing: 33, support: 10 },
+      },
+    },
+  })
+
+  // Create sample projects with workflow statuses
+  console.log('Creating sample projects with estimation data...')
+  const projectsData = [
+    { name: 'Salesforce CPQ Upgrade', priority: 1, status: 'active', workflowStatus: 'approved', sponsor: 'VP Sales', category: 'CRM', description: 'Upgrade CPQ module to latest version' },
+    { name: 'EDI Integration', priority: 2, status: 'in_planning', workflowStatus: 'estimating', sponsor: 'VP Supply Chain', category: 'ERP', description: 'New EDI partner integrations' },
+    { name: 'Data Lake Migration', priority: 3, status: 'not_started', workflowStatus: 'submitted', sponsor: 'CTO', category: 'Data', description: 'Migrate to cloud data lake' },
+    { name: 'SSO Implementation', priority: 4, status: 'active', workflowStatus: 'cost_review', sponsor: 'CISO', category: 'Security', description: 'Enterprise SSO rollout' },
+    { name: 'Mobile App v2', priority: 5, status: 'in_planning', workflowStatus: 'estimated', sponsor: 'VP Digital', category: 'Digital', description: 'Next-gen mobile app' },
+  ]
+
+  for (const p of projectsData) {
+    const project = await prisma.project.create({
+      data: { ...p, orgId: org.id },
+    })
+
+    // Add team estimates with dev hours
+    const teamKeys = Object.keys(teams)
+    const teamKey = teamKeys[Math.floor(Math.random() * teamKeys.length)]
+    const devHours = [80, 200, 400, 120, 600][projectsData.indexOf(p)]
+
+    await prisma.teamEstimate.create({
+      data: {
+        projectId: project.id,
+        teamId: teams[teamKey],
+        orgId: org.id,
+        devHours: devHours,
+        development: devHours,
+        design: Math.round(devHours * 0.05),
+        testing: Math.round(devHours * 0.33),
+        deployment: Math.round(devHours * 0.05),
+        postDeploy: Math.round(devHours * 0.1),
+      },
+    })
+
+    console.log(`  ✓ ${p.name} (${p.workflowStatus}) - ${devHours}h dev`)
+  }
+
   console.log('\n✅ PetSafe Brands seeded successfully!')
   console.log(`   Org: ${org.name} (${org.id})`)
   console.log(`   Login: admin@petsafe.com / password123`)

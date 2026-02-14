@@ -20,10 +20,10 @@ model Organization {
   defaultHoursPerWeek  Int      @default(40)
   capacityAmber        Int      @default(75)
   capacityRed          Int      @default(90)
-  blendedRate          Float    @default(95)
-  estimationConfig     Json     @default("{}")
   holidays             Json     @default("[]")
   roleTemplates        Json     @default("[]")
+  blendedRate          Float    @default(95)
+  estimationConfig     Json     @default("{}")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -168,18 +168,18 @@ model Project {
   riskLevel       String?
   riskNotes       String?
   committedDate   String?
-  workflowStatus  String   @default("submitted")
-  estimatedCost   Float?
-  capexAmount     Float?
-  opexAmount      Float?
-  estimatedWeeks  Float?
-  teamSizeRecommended Float?
-  testingModel    String?
-  estimationConfig Json    @default("{}")
-  approvedBy      String?
-  approvedAt      DateTime?
-  submittedBy     String?
-  submittedAt     DateTime?
+  workflowStatus        String   @default("submitted")
+  estimatedCost         Float?
+  capexAmount           Float?
+  opexAmount            Float?
+  estimatedWeeks        Float?
+  teamSizeRecommended   Float?
+  testingModel          String?
+  estimationConfig      Json     @default("{}")
+  approvedBy            String?
+  approvedAt            DateTime?
+  submittedBy           String?
+  submittedAt           DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -206,9 +206,9 @@ model TeamEstimate {
   deployment  Float  @default(0)
   postDeploy  Float  @default(0)
   roleBreakdown Json     @default("{}")
-  devHours    Float    @default(0)
-  calculatedPhases Json @default("{}")
   confidence  String? // high, medium, low
+  devHours        Float    @default(0)
+  calculatedPhases Json    @default("{}")
 
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
