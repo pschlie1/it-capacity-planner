@@ -4,8 +4,8 @@ import { createAuditLog } from './audit';
 function serializeResource(r: any) {
   return {
     ...r,
-    skills: JSON.parse(r.skills || '[]'),
-    ptoBlocks: JSON.parse(r.ptoBlocks || '[]'),
+    skills: r.skills || [],
+    ptoBlocks: r.ptoBlocks || [],
   };
 }
 
@@ -25,8 +25,8 @@ export async function createResource(orgId: string, userId: string, data: any) {
   const resource = await prisma.resource.create({
     data: {
       ...rest,
-      skills: JSON.stringify(skills || []),
-      ptoBlocks: JSON.stringify(ptoBlocks || []),
+      skills: skills || [],
+      ptoBlocks: ptoBlocks || [],
       orgId,
     },
   });
@@ -39,8 +39,8 @@ export async function updateResource(orgId: string, userId: string, id: string, 
   if (!existing) return null;
   const { skills, ptoBlocks, ...rest } = data;
   const updateData: any = { ...rest };
-  if (skills !== undefined) updateData.skills = JSON.stringify(skills);
-  if (ptoBlocks !== undefined) updateData.ptoBlocks = JSON.stringify(ptoBlocks);
+  if (skills !== undefined) updateData.skills = skills;
+  if (ptoBlocks !== undefined) updateData.ptoBlocks = ptoBlocks;
   const resource = await prisma.resource.update({ where: { id }, data: updateData });
   await createAuditLog({ orgId, userId, action: 'UPDATE', entity: 'Resource', entityId: id });
   return serializeResource(resource);
@@ -76,7 +76,6 @@ export async function getSkillRequirements(orgId: string, projectId?: string) {
 }
 
 export async function getProductivitySettings() {
-  // Static for now - could be moved to org settings
   return {
     Junior: 0.5, Mid: 0.75, Senior: 1.0, Lead: 1.1, Principal: 1.2,
     mentorshipOverheadPct: 15,

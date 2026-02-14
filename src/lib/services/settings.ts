@@ -7,9 +7,9 @@ export async function getSettings(orgId: string) {
   return {
     fiscalYearStartMonth: org.fiscalYearStartMonth,
     defaultHoursPerWeek: org.defaultHoursPerWeek,
-    holidays: JSON.parse(org.holidays),
+    holidays: org.holidays || [],
     capacityThresholds: { amber: org.capacityAmber, red: org.capacityRed },
-    roleTemplates: JSON.parse(org.roleTemplates),
+    roleTemplates: org.roleTemplates || [],
   };
 }
 
@@ -17,12 +17,12 @@ export async function updateSettings(orgId: string, userId: string, data: any) {
   const updateData: any = {};
   if (data.fiscalYearStartMonth !== undefined) updateData.fiscalYearStartMonth = data.fiscalYearStartMonth;
   if (data.defaultHoursPerWeek !== undefined) updateData.defaultHoursPerWeek = data.defaultHoursPerWeek;
-  if (data.holidays !== undefined) updateData.holidays = JSON.stringify(data.holidays);
+  if (data.holidays !== undefined) updateData.holidays = data.holidays;
   if (data.capacityThresholds !== undefined) {
     updateData.capacityAmber = data.capacityThresholds.amber;
     updateData.capacityRed = data.capacityThresholds.red;
   }
-  if (data.roleTemplates !== undefined) updateData.roleTemplates = JSON.stringify(data.roleTemplates);
+  if (data.roleTemplates !== undefined) updateData.roleTemplates = data.roleTemplates;
 
   await prisma.organization.update({ where: { id: orgId }, data: updateData });
   await createAuditLog({ orgId, userId, action: 'UPDATE', entity: 'Organization', entityId: orgId, changes: data });

@@ -4,13 +4,13 @@ import { createAuditLog } from './audit';
 function serializeProject(p: any) {
   return {
     ...p,
-    requiredSkills: JSON.parse(p.requiredSkills || '[]'),
-    dependencies: JSON.parse(p.dependencies || '[]'),
-    milestones: JSON.parse(p.milestones || '[]'),
-    actualHours: JSON.parse(p.actualHours || '{}'),
+    requiredSkills: p.requiredSkills || [],
+    dependencies: p.dependencies || [],
+    milestones: p.milestones || [],
+    actualHours: p.actualHours || {},
     teamEstimates: p.teamEstimates?.map((te: any) => ({
       ...te,
-      roleBreakdown: JSON.parse(te.roleBreakdown || '{}'),
+      roleBreakdown: te.roleBreakdown || {},
       team: te.team,
     })) || [],
   };
@@ -40,10 +40,10 @@ export async function createProject(orgId: string, userId: string, data: any) {
   const project = await prisma.project.create({
     data: {
       ...rest,
-      requiredSkills: JSON.stringify(requiredSkills || []),
-      dependencies: JSON.stringify(dependencies || []),
-      milestones: JSON.stringify(milestones || []),
-      actualHours: JSON.stringify(actualHours || {}),
+      requiredSkills: requiredSkills || [],
+      dependencies: dependencies || [],
+      milestones: milestones || [],
+      actualHours: actualHours || {},
       orgId,
     },
   });
@@ -58,7 +58,7 @@ export async function createProject(orgId: string, userId: string, data: any) {
         testing: te.testing || 0,
         deployment: te.deployment || 0,
         postDeploy: te.postDeploy || 0,
-        roleBreakdown: JSON.stringify(te.roleBreakdown || {}),
+        roleBreakdown: te.roleBreakdown || {},
         confidence: te.confidence,
         orgId,
       })),
@@ -75,10 +75,10 @@ export async function updateProject(orgId: string, userId: string, id: string, d
 
   const { teamEstimates, requiredSkills, dependencies, milestones, actualHours, ...rest } = data;
   const updateData: any = { ...rest };
-  if (requiredSkills !== undefined) updateData.requiredSkills = JSON.stringify(requiredSkills);
-  if (dependencies !== undefined) updateData.dependencies = JSON.stringify(dependencies);
-  if (milestones !== undefined) updateData.milestones = JSON.stringify(milestones);
-  if (actualHours !== undefined) updateData.actualHours = JSON.stringify(actualHours);
+  if (requiredSkills !== undefined) updateData.requiredSkills = requiredSkills;
+  if (dependencies !== undefined) updateData.dependencies = dependencies;
+  if (milestones !== undefined) updateData.milestones = milestones;
+  if (actualHours !== undefined) updateData.actualHours = actualHours;
 
   await prisma.project.update({ where: { id }, data: updateData });
 
@@ -94,7 +94,7 @@ export async function updateProject(orgId: string, userId: string, id: string, d
           testing: te.testing || 0,
           deployment: te.deployment || 0,
           postDeploy: te.postDeploy || 0,
-          roleBreakdown: JSON.stringify(te.roleBreakdown || {}),
+          roleBreakdown: te.roleBreakdown || {},
           confidence: te.confidence,
           orgId,
         })),

@@ -20,17 +20,17 @@ async function main() {
     data: {
       name: 'Acme Corp',
       slug: 'acme-corp',
-      holidays: JSON.stringify([
+      holidays: [
         { name: 'New Year', week: 1 }, { name: 'MLK Day', week: 3 },
         { name: 'Presidents Day', week: 8 }, { name: 'Memorial Day', week: 22 },
         { name: 'Independence Day', week: 27 }, { name: 'Labor Day', week: 36 },
         { name: 'Thanksgiving', week: 48 }, { name: 'Christmas', week: 52 },
-      ]),
-      roleTemplates: JSON.stringify([
+      ],
+      roleTemplates: [
         { name: 'Small Team', roles: { architect: 0.5, developer: 2, qa: 0.5, devops: 0.5 } },
         { name: 'Medium Team', roles: { pm: 0.5, architect: 1, developer: 4, qa: 1.5, devops: 1, businessAnalyst: 0.5 } },
         { name: 'Large Team', roles: { pm: 1, productManager: 0.5, architect: 1.5, developer: 6, qa: 2, devops: 1.5, dba: 1, businessAnalyst: 1 } },
-      ]),
+      ],
     },
   });
 
@@ -59,7 +59,7 @@ async function main() {
   for (const t of teamDefs) {
     const { skills, ...rest } = t;
     const team = await prisma.team.create({
-      data: { ...rest, skills: JSON.stringify(skills), orgId: org.id },
+      data: { ...rest, skills: skills, orgId: org.id },
     });
     teams.push(team);
   }
@@ -96,10 +96,10 @@ async function main() {
     const project = await prisma.project.create({
       data: {
         ...rest,
-        requiredSkills: JSON.stringify([]),
-        dependencies: JSON.stringify([]),
-        milestones: JSON.stringify(milestones || []),
-        actualHours: JSON.stringify({}),
+        requiredSkills: [],
+        dependencies: [],
+        milestones: milestones || [],
+        actualHours: {},
         orgId: org.id,
       },
     });
@@ -107,9 +107,9 @@ async function main() {
   }
 
   // Set dependencies
-  await prisma.project.update({ where: { id: projects[13].id }, data: { dependencies: JSON.stringify([projects[1].id]) } });
-  await prisma.project.update({ where: { id: projects[7].id }, data: { dependencies: JSON.stringify([projects[1].id]) } });
-  await prisma.project.update({ where: { id: projects[17].id }, data: { dependencies: JSON.stringify([projects[2].id]) } });
+  await prisma.project.update({ where: { id: projects[13].id }, data: { dependencies: [projects[1].id] } });
+  await prisma.project.update({ where: { id: projects[7].id }, data: { dependencies: [projects[1].id] } });
+  await prisma.project.update({ where: { id: projects[17].id }, data: { dependencies: [projects[2].id] } });
 
   // Team Estimates
   const estimateDefs = [
@@ -281,8 +281,8 @@ async function main() {
       data: {
         ...rest,
         baseHoursPerWeek: 40,
-        skills: JSON.stringify(skills),
-        ptoBlocks: JSON.stringify([]),
+        skills: skills,
+        ptoBlocks: [],
         avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
         orgId: org.id,
       },

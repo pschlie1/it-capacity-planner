@@ -1,7 +1,3 @@
-// Compatibility layer: provides the same interface as the old in-memory store
-// but loads data from the database via services.
-// Used by resource analytics functions that need the full dataset shape.
-
 import { prisma } from './db';
 
 export async function getStoreFromDB(orgId: string) {
@@ -14,19 +10,22 @@ export async function getStoreFromDB(orgId: string) {
   ]);
 
   return {
-    teams: teams.map(t => ({ ...t, skills: JSON.parse(t.skills) })),
+    teams: teams.map(t => ({ ...t, skills: (t.skills || []) as any[] })),
     projects: projects.map(p => ({
       ...p,
-      requiredSkills: JSON.parse(p.requiredSkills),
-      dependencies: JSON.parse(p.dependencies),
-      milestones: JSON.parse(p.milestones),
-      actualHours: JSON.parse(p.actualHours),
-      teamEstimates: p.teamEstimates,
+      requiredSkills: (p.requiredSkills || []) as any[],
+      dependencies: (p.dependencies || []) as any[],
+      milestones: (p.milestones || []) as any[],
+      actualHours: (p.actualHours || {}) as any,
+      teamEstimates: p.teamEstimates.map(te => ({
+        ...te,
+        roleBreakdown: (te.roleBreakdown || {}) as any,
+      })),
     })),
     resources: resources.map(r => ({
       ...r,
-      skills: JSON.parse(r.skills),
-      ptoBlocks: JSON.parse(r.ptoBlocks),
+      skills: (r.skills || []) as any[],
+      ptoBlocks: (r.ptoBlocks || []) as any[],
     })),
     assignments,
     skillReqs,

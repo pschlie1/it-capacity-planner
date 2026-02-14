@@ -43,17 +43,17 @@ export async function POST(req: Request) {
         data: {
           name: orgName,
           slug,
-          holidays: JSON.stringify([
+          holidays: [
             { name: 'New Year', week: 1 }, { name: 'MLK Day', week: 3 },
             { name: 'Presidents Day', week: 8 }, { name: 'Memorial Day', week: 22 },
             { name: 'Independence Day', week: 27 }, { name: 'Labor Day', week: 36 },
             { name: 'Thanksgiving', week: 48 }, { name: 'Christmas', week: 52 },
-          ]),
-          roleTemplates: JSON.stringify([
+          ],
+          roleTemplates: [
             { name: 'Small Team', roles: { architect: 0.5, developer: 2, qa: 0.5, devops: 0.5 } },
             { name: 'Medium Team', roles: { pm: 0.5, architect: 1, developer: 4, qa: 1.5, devops: 1, businessAnalyst: 0.5 } },
             { name: 'Large Team', roles: { pm: 1, productManager: 0.5, architect: 1.5, developer: 6, qa: 2, devops: 1.5, dba: 1, businessAnalyst: 1 } },
-          ]),
+          ],
         },
       });
 

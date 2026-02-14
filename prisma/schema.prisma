@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================
@@ -19,8 +20,8 @@ model Organization {
   defaultHoursPerWeek  Int      @default(40)
   capacityAmber        Int      @default(75)
   capacityRed          Int      @default(90)
-  holidays             String   @default("[]") // JSON array
-  roleTemplates        String   @default("[]") // JSON array
+  holidays             Json     @default("[]")
+  roleTemplates        Json     @default("[]")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -116,7 +117,7 @@ model Team {
   dbaFte             Float    @default(0)
   kloTlmHoursPerWeek Float    @default(0)
   adminPct           Float    @default(25)
-  skills             String   @default("[]") // JSON array of strings
+  skills             Json     @default("[]")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -144,10 +145,10 @@ model Project {
   category        String?
   sponsor         String?
   businessValue   String?
-  requiredSkills  String   @default("[]") // JSON array
-  dependencies    String   @default("[]") // JSON array of project IDs
-  milestones      String   @default("[]") // JSON array
-  actualHours     String   @default("{}") // JSON object
+  requiredSkills  Json     @default("[]")
+  dependencies    Json     @default("[]")
+  milestones      Json     @default("[]")
+  actualHours     Json     @default("{}")
   quarterTarget   String?
   riskLevel       String?
   riskNotes       String?
@@ -177,7 +178,7 @@ model TeamEstimate {
   testing     Float  @default(0)
   deployment  Float  @default(0)
   postDeploy  Float  @default(0)
-  roleBreakdown String @default("{}") // JSON
+  roleBreakdown Json     @default("{}")
   confidence  String? // high, medium, low
 
   orgId String
@@ -254,8 +255,8 @@ model Resource {
   hireDate         String
   hourlyCostRate   Float    @default(0)
   baseHoursPerWeek Float    @default(40)
-  skills           String   @default("[]") // JSON array of {name, proficiency}
-  ptoBlocks        String   @default("[]") // JSON array
+  skills           Json     @default("[]")
+  ptoBlocks        Json     @default("[]")
   avatarColor      String   @default("#3b82f6")
   email            String   @default("")
   createdAt        DateTime @default(now())
@@ -370,7 +371,7 @@ model AuditLog {
   action    String   // CREATE, UPDATE, DELETE
   entity    String   // Team, Project, Resource, etc.
   entityId  String
-  changes   String?  // JSON before/after diff
+  changes   Json?
   createdAt DateTime @default(now())
 
   orgId  String

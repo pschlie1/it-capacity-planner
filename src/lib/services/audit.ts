@@ -15,7 +15,7 @@ export async function createAuditLog(params: {
       action: params.action,
       entity: params.entity,
       entityId: params.entityId,
-      changes: params.changes ? JSON.stringify(params.changes) : null,
+      changes: params.changes || undefined,
     },
   });
 }
