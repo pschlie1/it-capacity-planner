@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/api-auth';
 import * as resourceService from '@/lib/services/resources';
+import { prisma } from '@/lib/db';
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const auth = await requireAuth();
@@ -15,4 +16,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const data = await req.json();
   const resource = await resourceService.updateResource(auth.orgId, auth.user.id, params.id, data);
   return resource ? NextResponse.json(resource) : NextResponse.json({ error: 'Not found' }, { status: 404 });
+}
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const auth = await requireAuth('ADMIN');
+  if (isAuthError(auth)) return auth;
+  const existing = await prisma.resource.findFirst({ where: { id: params.id, orgId: auth.orgId } });
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  await prisma.resource.delete({ where: { id: params.id } });
+  return NextResponse.json({ success: true });
 }

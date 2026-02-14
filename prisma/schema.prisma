@@ -39,6 +39,7 @@ model Organization {
   actuals         ActualEntry[]
   auditLogs       AuditLog[]
   skillRequirements ProjectSkillRequirement[]
+  holidayEntries    Holiday[]
 
   @@index([slug])
 }
@@ -105,6 +106,12 @@ model VerificationToken {
 model Team {
   id                 String   @id @default(cuid())
   name               String
+  description        String   @default("")
+  department         String   @default("")
+  costCenter         String   @default("")
+  managerName        String   @default("")
+  location           String   @default("")
+  timezone           String   @default("America/New_York")
   pmFte              Float    @default(0)
   productManagerFte  Float    @default(0)
   uxDesignerFte      Float?
@@ -145,10 +152,16 @@ model Project {
   category        String?
   sponsor         String?
   businessValue   String?
+  estimatedRoi    String?
+  strategicNotes  String?
+  targetStartDate String?
+  targetEndDate   String?
+  riskMitigation  String?
   requiredSkills  Json     @default("[]")
   dependencies    Json     @default("[]")
   milestones      Json     @default("[]")
   actualHours     Json     @default("{}")
+  statusHistory   Json     @default("[]")
   quarterTarget   String?
   riskLevel       String?
   riskNotes       String?
@@ -253,8 +266,17 @@ model Resource {
   roleType         String
   seniority        String
   hireDate         String
+  employeeId       String   @default("")
+  isContractor     Boolean  @default(false)
+  endDate          String?
+  annualSalary     Float?
   hourlyCostRate   Float    @default(0)
   baseHoursPerWeek Float    @default(40)
+  trainingPct      Float    @default(0)
+  onCallPct        Float    @default(0)
+  rampUpWeeks      Int      @default(0)
+  rampUpStart      String?
+  notes            String   @default("")
   skills           Json     @default("[]")
   ptoBlocks        Json     @default("[]")
   avatarColor      String   @default("#3b82f6")
@@ -315,16 +337,39 @@ model ProjectSkillRequirement {
 model PTOEntry {
   id           String @id @default(cuid())
   teamId       String
+  resourceId   String?
   role         String
   personName   String
+  startDate    String   @default("")
+  endDate      String   @default("")
   startWeek    Int
   endWeek      Int
+  hoursPerDay  Float    @default(8)
   hoursPerWeek Float
+  ptoType      String   @default("Vacation")
+  status       String   @default("Planned")
   reason       String
+  notes        String   @default("")
 
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   team  Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([resourceId])
+}
+
+model Holiday {
+  id          String @id @default(cuid())
+  name        String
+  date        String
+  week        Int
+  hoursOff    Float  @default(8)
+  recurring   Boolean @default(true)
+  holidaySet  String  @default("US Federal")
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId])
 }

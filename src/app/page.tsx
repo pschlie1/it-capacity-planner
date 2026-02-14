@@ -711,7 +711,7 @@ function TeamsTab({ teams, onRefresh }: { teams: Team[]; onRefresh: () => void }
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <h3 className="font-semibold">{team.name}</h3>
+                      <h3 className="font-semibold"><a href={`/teams/${team.id}`} className="hover:text-primary hover:underline">{team.name}</a></h3>
                       {team.skills && team.skills.length > 0 && (
                         <div className="flex gap-1 flex-wrap">
                           {team.skills.slice(0, 4).map(s => (
@@ -1025,7 +1025,7 @@ function ProjectsTab({ projects, teams, onRefresh }: { projects: Project[]; team
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-primary bg-primary/10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0">{p.priority}</span>
-                      <h3 className="font-semibold text-sm">{p.name}</h3>
+                      <h3 className="font-semibold text-sm"><a href={`/projects/${p.id}`} className="hover:text-primary hover:underline">{p.name}</a></h3>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] ${STATUS_COLORS[p.status]}`}>{STATUS_LABELS[p.status] || p.status}</span>
                       {p.tshirtSize && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted">{p.tshirtSize}</span>}
                       {p.businessValue && <span className={`text-[10px] px-1.5 py-0.5 rounded ${BV_COLORS[p.businessValue]}`}>{p.businessValue}</span>}
