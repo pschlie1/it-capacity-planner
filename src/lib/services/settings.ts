@@ -4,12 +4,18 @@ import { createAuditLog } from './audit';
 export async function getSettings(orgId: string) {
   const org = await prisma.organization.findUnique({ where: { id: orgId } });
   if (!org) return null;
+  const parseJson = (val: unknown, fallback: unknown[] = []) => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') { try { return JSON.parse(val); } catch { return fallback; } }
+    return fallback;
+  };
+
   return {
     fiscalYearStartMonth: org.fiscalYearStartMonth,
     defaultHoursPerWeek: org.defaultHoursPerWeek,
-    holidays: org.holidays || [],
+    holidays: parseJson(org.holidays),
     capacityThresholds: { amber: org.capacityAmber, red: org.capacityRed },
-    roleTemplates: org.roleTemplates || [],
+    roleTemplates: parseJson(org.roleTemplates),
   };
 }
 
