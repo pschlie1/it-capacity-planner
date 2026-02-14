@@ -14,7 +14,9 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              // unsafe-inline required for Next.js inline scripts; nonces not supported via static headers in Next.js
+              // unsafe-eval removed to prevent eval-based XSS
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",

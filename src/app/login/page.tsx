@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { BarChart3, LogIn, UserPlus, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -188,7 +189,10 @@ export default function LoginPage() {
           </form>
 
           {mode === 'login' && (
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-y-2">
+              <Link href="/forgot-password" className="text-xs text-primary hover:underline block">
+                Forgot password?
+              </Link>
               <p className="text-xs text-muted-foreground">
                 Demo: <span className="text-foreground font-mono">admin@acme.com</span> / <span className="text-foreground font-mono">password123</span>
               </p>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { guardMutation } from '@/lib/mutation-guard';
 
 const US_FEDERAL_2026 = [
   { name: "New Year's Day", date: '2026-01-01', week: 1 },
@@ -28,11 +29,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth('MEMBER');
   if (isAuthError(auth)) return auth;
-  const data = await req.json();
+  const { data, error } = await guardMutation(req);
+  if (error) return error;
+  const d = data as Record<string, unknown>;
 
-  // If it's a preset request, bulk create
-  if (data.preset === 'us-federal-2026') {
-    // Delete existing holidays with this set
+  if (d.preset === 'us-federal-2026') {
     await prisma.holiday.deleteMany({ where: { orgId: auth.orgId, holidaySet: 'US Federal' } });
     await prisma.holiday.createMany({
       data: US_FEDERAL_2026.map(h => ({
@@ -43,15 +44,14 @@ export async function POST(req: Request) {
     return NextResponse.json(holidays);
   }
 
-  // Single holiday creation
-  if (!data.name || !data.date || data.week == null) {
+  if (!d.name || !d.date || d.week == null) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
   const holiday = await prisma.holiday.create({
     data: {
-      name: data.name, date: data.date, week: data.week,
-      hoursOff: data.hoursOff || 8, recurring: data.recurring ?? true,
-      holidaySet: data.holidaySet || 'Custom', orgId: auth.orgId,
+      name: d.name as string, date: d.date as string, week: d.week as number,
+      hoursOff: (d.hoursOff as number) || 8, recurring: (d.recurring as boolean) ?? true,
+      holidaySet: (d.holidaySet as string) || 'Custom', orgId: auth.orgId,
     },
   });
   return NextResponse.json(holiday);

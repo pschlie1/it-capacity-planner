@@ -6,6 +6,7 @@ import {
   mergeEstimationConfig,
 } from '@/lib/services/estimation';
 import { z } from 'zod';
+import { guardMutation } from '@/lib/mutation-guard';
 
 const RecalcSchema = z.object({
   teamEstimates: z.array(z.object({
@@ -75,7 +76,8 @@ export async function POST(
   const auth = await requireAuth('MEMBER');
   if (isAuthError(auth)) return auth;
 
-  const body = await req.json();
+  const { data: body, error: csrfError } = await guardMutation(req);
+  if (csrfError) return csrfError;
   const parsed = RecalcSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid input', details: parsed.error.issues }, { status: 400 });

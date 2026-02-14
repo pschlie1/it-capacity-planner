@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/api-auth';
 import * as resourceService from '@/lib/services/resources';
+import { guardMutation } from '@/lib/mutation-guard';
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -15,15 +16,18 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth('MEMBER');
   if (isAuthError(auth)) return auth;
-  const data = await req.json();
-  const assignment = await resourceService.createAssignment(auth.orgId, auth.user.id, data);
+  const { data, error } = await guardMutation(req);
+  if (error) return error;
+  const assignment = await resourceService.createAssignment(auth.orgId, auth.user.id, data!);
   return NextResponse.json(assignment);
 }
 
 export async function DELETE(req: Request) {
   const auth = await requireAuth('MEMBER');
   if (isAuthError(auth)) return auth;
-  const { id } = await req.json();
+  const { data, error } = await guardMutation(req);
+  if (error) return error;
+  const { id } = data as { id: string };
   const ok = await resourceService.deleteAssignment(auth.orgId, auth.user.id, id);
   return ok ? NextResponse.json({ success: true }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }

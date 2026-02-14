@@ -1,3 +1,4 @@
+import { validateCsrf } from '@/lib/csrf';
 import { validateBody, checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
 import { aiMessageSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
@@ -8,6 +9,8 @@ import OpenAI from 'openai';
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
+  const csrfError = await validateCsrf(req);
+  if (csrfError) return csrfError;
 
   const ip = getClientIp(req);
   const { allowed } = checkRateLimit(ip);

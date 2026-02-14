@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { guardMutation } from '@/lib/mutation-guard';
 
 const WORKFLOW_TRANSITIONS: Record<string, string[]> = {
   submitted: ['estimating'],
@@ -24,7 +25,8 @@ export async function PATCH(
   const auth = await requireAuth('MEMBER');
   if (isAuthError(auth)) return auth;
 
-  const body = await req.json();
+  const { data: body, error: csrfError } = await guardMutation(req);
+  if (csrfError) return csrfError;
   const parsed = WorkflowSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid input', details: parsed.error.issues }, { status: 400 });

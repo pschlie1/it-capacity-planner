@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z, ZodSchema } from 'zod';
+import logger from '@/lib/logger';
 
 // ============================================
 // Rate Limiting (in-memory, per-IP)
@@ -65,7 +66,7 @@ export async function validateBody<T>(req: Request, schema: ZodSchema<T>): Promi
 // Safe Error Response (no stack traces)
 // ============================================
 export function safeErrorResponse(error: unknown, context: string) {
-  console.error(`[${context}]`, error instanceof Error ? error.message : error);
+  logger.error({ err: error instanceof Error ? error : undefined, context }, `${context} failed`);
   return NextResponse.json(
     { error: `${context} failed. Please try again.` },
     { status: 500 }

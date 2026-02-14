@@ -1,3 +1,4 @@
+import { validateCsrf } from '@/lib/csrf';
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
 import { requireAuth, isAuthError } from '@/lib/api-auth';
@@ -37,6 +38,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (isAuthError(auth)) return auth;
+  const csrfError = await validateCsrf(req);
+  if (csrfError) return csrfError;
 
   const ip = getClientIp(req);
   const { allowed } = checkRateLimit(ip);

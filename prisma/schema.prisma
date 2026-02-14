@@ -55,10 +55,12 @@ model User {
   email          String   @unique
   name           String?
   passwordHash   String
-  role           String   @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
-  lastActiveAt   DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  role              String    @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
+  lastActiveAt      DateTime?
+  resetToken        String?   @unique
+  resetTokenExpiry  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import logger from '@/lib/logger';
 import { prisma } from '@/lib/db';
+import { sanitize } from '@/lib/sanitize';
+import { checkRateLimit, getRateLimitResponse, getClientIp } from '@/lib/api-utils';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
@@ -12,13 +15,20 @@ const signupSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // Rate limit: 5 attempts per minute per IP
+    const ip = getClientIp(req);
+    const { allowed } = checkRateLimit(`auth:signup:${ip}`, 5);
+    if (!allowed) return getRateLimitResponse();
+
     const body = await req.json();
     const parsed = signupSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { email, password, name, orgName } = parsed.data;
+    const { email, password, name: rawName, orgName: rawOrgName } = parsed.data;
+    const name = sanitize(rawName);
+    const orgName = sanitize(rawOrgName);
 
     // Check if email already exists
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -76,7 +86,7 @@ export async function POST(req: Request) {
       org: { id: result.org.id, name: result.org.name, slug: result.org.slug },
     });
   } catch (error: any) {
-    console.error('Signup error:', error);
+    logger.error({ err: error }, 'Signup error');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

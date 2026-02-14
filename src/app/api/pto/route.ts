@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { guardMutation } from '@/lib/mutation-guard';
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -8,7 +9,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const teamId = searchParams.get('teamId');
   const resourceId = searchParams.get('resourceId');
-  const where: any = { orgId: auth.orgId };
+  const where: Record<string, string> = { orgId: auth.orgId };
   if (teamId) where.teamId = teamId;
   if (resourceId) where.resourceId = resourceId;
   const entries = await prisma.pTOEntry.findMany({ where, orderBy: { startWeek: 'asc' } });
@@ -18,26 +19,28 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth('MEMBER');
   if (isAuthError(auth)) return auth;
-  const data = await req.json();
-  if (!data.teamId || !data.personName || data.startWeek == null || data.endWeek == null) {
+  const { data, error } = await guardMutation(req);
+  if (error) return error;
+  const d = data as Record<string, unknown>;
+  if (!d.teamId || !d.personName || d.startWeek == null || d.endWeek == null) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
   const entry = await prisma.pTOEntry.create({
     data: {
-      teamId: data.teamId,
-      resourceId: data.resourceId || null,
-      role: data.role || '',
-      personName: data.personName,
-      startDate: data.startDate || '',
-      endDate: data.endDate || '',
-      startWeek: data.startWeek,
-      endWeek: data.endWeek,
-      hoursPerDay: data.hoursPerDay || 8,
-      hoursPerWeek: data.hoursPerWeek || 40,
-      ptoType: data.ptoType || 'Vacation',
-      status: data.status || 'Planned',
-      reason: data.reason || data.ptoType || 'Vacation',
-      notes: data.notes || '',
+      teamId: d.teamId as string,
+      resourceId: (d.resourceId as string) || null,
+      role: (d.role as string) || '',
+      personName: d.personName as string,
+      startDate: (d.startDate as string) || '',
+      endDate: (d.endDate as string) || '',
+      startWeek: d.startWeek as number,
+      endWeek: d.endWeek as number,
+      hoursPerDay: (d.hoursPerDay as number) || 8,
+      hoursPerWeek: (d.hoursPerWeek as number) || 40,
+      ptoType: (d.ptoType as string) || 'Vacation',
+      status: (d.status as string) || 'Planned',
+      reason: (d.reason as string) || (d.ptoType as string) || 'Vacation',
+      notes: (d.notes as string) || '',
       orgId: auth.orgId,
     },
   });

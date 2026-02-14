@@ -391,20 +391,25 @@ export function mergeEstimationConfig(
   projectConfig: Record<string, unknown>
 ): EstimationConfig {
   const base = { ...DEFAULT_ESTIMATION_CONFIG };
+  const defaultPercentages = { ...DEFAULT_ESTIMATION_CONFIG.percentages };
 
   // Deep merge org config
   if (orgConfig && typeof orgConfig === 'object') {
-    Object.assign(base, orgConfig);
-    if (orgConfig.percentages && typeof orgConfig.percentages === 'object') {
-      base.percentages = { ...base.percentages, ...(orgConfig.percentages as Record<string, number>) };
+    const { percentages: orgPct, ...orgRest } = orgConfig;
+    Object.assign(base, orgRest);
+    if (orgPct && typeof orgPct === 'object') {
+      base.percentages = { ...defaultPercentages, ...(orgPct as Record<string, number>) };
+    } else {
+      base.percentages = { ...defaultPercentages };
     }
   }
 
   // Deep merge project config (overrides org)
   if (projectConfig && typeof projectConfig === 'object') {
-    Object.assign(base, projectConfig);
-    if (projectConfig.percentages && typeof projectConfig.percentages === 'object') {
-      base.percentages = { ...base.percentages, ...(projectConfig.percentages as Record<string, number>) };
+    const { percentages: projPct, ...projRest } = projectConfig;
+    Object.assign(base, projRest);
+    if (projPct && typeof projPct === 'object') {
+      base.percentages = { ...base.percentages, ...(projPct as Record<string, number>) };
     }
   }
 
