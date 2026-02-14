@@ -7,7 +7,7 @@ interface Project {
   id: string;
   name: string;
   priority: number;
-  workflowStatus: string;
+  workflowStatus?: string;
   sponsor?: string;
   category?: string;
   estimatedCost?: number | null;
