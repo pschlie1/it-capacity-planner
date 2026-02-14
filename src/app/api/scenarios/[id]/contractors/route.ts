@@ -1,15 +1,19 @@
-import { addContractor, removeContractor, getTeams } from '@/lib/store';
 import { NextResponse } from 'next/server';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as scenarioService from '@/lib/services/scenarios';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
   const data = await req.json();
-  const contractor = addContractor({ ...data, scenarioId: params.id });
-  const team = getTeams().find(t => t.id === contractor.teamId);
-  return NextResponse.json({ ...contractor, team });
+  const contractor = await scenarioService.addContractor(auth.orgId, auth.user.id, params.id, data);
+  return contractor ? NextResponse.json(contractor) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
   const { contractorId } = await req.json();
-  removeContractor(contractorId);
-  return NextResponse.json({ success: true });
+  const ok = await scenarioService.removeContractor(auth.orgId, auth.user.id, params.id, contractorId);
+  return ok ? NextResponse.json({ success: true }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }

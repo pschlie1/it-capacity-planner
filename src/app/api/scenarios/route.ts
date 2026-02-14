@@ -1,19 +1,21 @@
-import { getScenarios, createScenario, getContractors, getPriorityOverrides, getTeams } from '@/lib/store';
 import { NextResponse } from 'next/server';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as scenarioService from '@/lib/services/scenarios';
+import { scenarioCreateSchema } from '@/lib/schemas';
 
 export async function GET() {
-  const scenarios = getScenarios();
-  const teams = getTeams();
-  const result = scenarios.map(s => ({
-    ...s,
-    priorityOverrides: getPriorityOverrides(s.id),
-    contractors: getContractors(s.id).map(c => ({ ...c, team: teams.find(t => t.id === c.teamId) })),
-  }));
-  return NextResponse.json(result);
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  const scenarios = await scenarioService.getScenarios(auth.orgId);
+  return NextResponse.json(scenarios);
 }
 
 export async function POST(req: Request) {
-  const data = await req.json();
-  const scenario = createScenario(data);
-  return NextResponse.json({ ...scenario, priorityOverrides: [], contractors: [] });
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
+  const body = await req.json();
+  const parsed = scenarioCreateSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const scenario = await scenarioService.createScenario(auth.orgId, auth.user.id, parsed.data);
+  return NextResponse.json(scenario);
 }

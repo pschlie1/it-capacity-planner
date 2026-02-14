@@ -1,29 +1,29 @@
-import { getTeams, getProjects, getTeamEstimates } from '@/lib/store';
 import { NextResponse } from 'next/server';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as teamService from '@/lib/services/teams';
+import * as projectService from '@/lib/services/projects';
 
 export async function GET() {
-  const teams = getTeams();
-  const projects = getProjects();
-  const estimates = getTeamEstimates();
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
 
-  let csv = 'Type,ID,Name,Priority,Status,Category,Sponsor,BusinessValue,Quarter,RiskLevel,TotalHours\n';
+  const teams = await teamService.getTeams(auth.orgId);
+  const projects = await projectService.getProjects(auth.orgId);
+
+  let csv = 'Project,Priority,Status,Team,Design Hours,Development Hours,Testing Hours,Deployment Hours,Post-Deploy Hours,Total Hours\n';
 
   for (const p of projects) {
-    const ests = estimates.filter(e => e.projectId === p.id);
-    const hours = ests.reduce((s, e) => s + e.design + e.development + e.testing + e.deployment + e.postDeploy, 0);
-    csv += `Project,${p.id},"${p.name}",${p.priority},${p.status},${p.category || ''},${p.sponsor || ''},${p.businessValue || ''},${p.quarterTarget || ''},${p.riskLevel || ''},${hours}\n`;
-  }
-
-  csv += '\nTeam,ID,Name,TotalFTE,Architect,Developer,QA,DevOps,BA,DBA,PM,KLO_Hours,Admin_Pct\n';
-  for (const t of teams) {
-    const totalFte = t.architectFte + t.developerFte + t.qaFte + t.devopsFte + t.businessAnalystFte + t.dbaFte + t.pmFte + t.productManagerFte;
-    csv += `Team,${t.id},"${t.name}",${totalFte.toFixed(1)},${t.architectFte},${t.developerFte},${t.qaFte},${t.devopsFte},${t.businessAnalystFte},${t.dbaFte},${t.pmFte},${t.kloTlmHoursPerWeek},${t.adminPct}\n`;
+    for (const te of p.teamEstimates) {
+      const team = teams.find(t => t.id === te.teamId);
+      const total = te.design + te.development + te.testing + te.deployment + te.postDeploy;
+      csv += `"${p.name}",${p.priority},${p.status},"${team?.name || 'Unknown'}",${te.design},${te.development},${te.testing},${te.deployment},${te.postDeploy},${total}\n`;
+    }
   }
 
   return new NextResponse(csv, {
     headers: {
       'Content-Type': 'text/csv',
-      'Content-Disposition': 'attachment; filename="capacity-plan-export.csv"',
+      'Content-Disposition': 'attachment; filename="capacity-plan.csv"',
     },
   });
 }

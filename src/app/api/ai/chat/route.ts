@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
-import { createProject, getTeams, getTeamEstimates, updateProject, createScenario, setPriorityOverrides, addContractor, getProjects } from '@/lib/store';
-import { createAssignment, getResources } from '@/lib/resource-store';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as projectService from '@/lib/services/projects';
+import * as scenarioService from '@/lib/services/scenarios';
 import { validateBody, checkRateLimit, getRateLimitResponse, safeErrorResponse, getClientIp } from '@/lib/api-utils';
 import { aiChatSchema } from '@/lib/schemas';
 import OpenAI from 'openai';
@@ -33,45 +34,47 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
-function executeTool(name: string, args: Record<string, unknown>): string {
-  const projects = getProjects();
-  if (name === 'adjust_project_priority') {
-    const proj = projects.find(p => p.name.toLowerCase().includes((args.projectName as string).toLowerCase()));
-    if (!proj) return `Project "${args.projectName}" not found`;
-    updateProject(proj.id, { priority: args.newPriority as number });
-    return `Updated ${proj.name} priority to ${args.newPriority}`;
-  }
-  if (name === 'update_project_status') {
-    const proj = projects.find(p => p.name.toLowerCase().includes((args.projectName as string).toLowerCase()));
-    if (!proj) return `Project "${args.projectName}" not found`;
-    updateProject(proj.id, { status: args.status as string } as any);
-    return `Updated ${proj.name} status to ${args.status}`;
-  }
-  if (name === 'create_scenario') {
-    const scenario = createScenario({ name: args.name as string });
-    return `Created scenario "${args.name}" (id: ${scenario.id})`;
-  }
-  return 'Unknown tool';
-}
-
 export async function POST(req: Request) {
-  // Rate limiting
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+
   const ip = getClientIp(req);
   const { allowed } = checkRateLimit(ip);
   if (!allowed) return getRateLimitResponse();
 
-  // Input validation
   const validated = await validateBody(req, aiChatSchema);
   if ('error' in validated) return validated.error;
   const clientMessages = validated.data.messages;
 
-  const { contextText } = buildAIContext();
+  const orgId = (auth as any).orgId as string;
+  const userId = (auth as any).user.id as string;
+  const { contextText, data } = await buildAIContext(orgId);
+
+  async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+    const projects = data.projects;
+    if (name === 'adjust_project_priority') {
+      const proj = projects.find((p: any) => p.name.toLowerCase().includes((args.projectName as string).toLowerCase()));
+      if (!proj) return `Project "${args.projectName}" not found`;
+      await projectService.updateProject(orgId, userId, proj.id, { priority: args.newPriority as number });
+      return `Updated ${proj.name} priority to ${args.newPriority}`;
+    }
+    if (name === 'update_project_status') {
+      const proj = projects.find((p: any) => p.name.toLowerCase().includes((args.projectName as string).toLowerCase()));
+      if (!proj) return `Project "${args.projectName}" not found`;
+      await projectService.updateProject(orgId, userId, proj.id, { status: args.status as string });
+      return `Updated ${proj.name} status to ${args.status}`;
+    }
+    if (name === 'create_scenario') {
+      const scenario = await scenarioService.createScenario(orgId, userId, { name: args.name as string });
+      return `Created scenario "${args.name}" (id: ${scenario?.id})`;
+    }
+    return 'Unknown tool';
+  }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({
-      response: '**Demo Mode** — Set OPENAI_API_KEY to enable full AI analysis. Current data shows ' +
-        buildAIContext().data.projects.length + ' projects across ' + buildAIContext().data.teams.length + ' teams.',
+      response: `**Demo Mode** — Set OPENAI_API_KEY. ${data.projects.length} projects across ${data.teams.length} teams.`,
       suggestions: ['What are the top risks?', 'Show team utilization', 'Which projects are over capacity?']
     });
   }
@@ -80,17 +83,7 @@ export async function POST(req: Request) {
     const openai = new OpenAI({ apiKey });
     const systemMsg = {
       role: 'system' as const,
-      content: `You are an expert IT capacity planning analyst with deep knowledge of project management, resource allocation, and portfolio optimization. You have access to the organization's complete capacity planning data below. 
-
-INSTRUCTIONS:
-- Provide actionable, data-driven insights using specific numbers, names, and dates
-- Format responses with markdown for readability
-- When showing data, use tables or structured lists
-- Always suggest 2-3 follow-up questions at the end (prefix with "💡 ")
-- You can use tools to modify data when the user asks you to make changes
-- Be concise but thorough
-
-${contextText}`
+      content: `You are an expert IT capacity planning analyst. Provide actionable, data-driven insights. Use markdown. Always suggest 2-3 follow-up questions (prefix with "💡 "). You can use tools to modify data.\n\n${contextText}`
     };
 
     const messages = [systemMsg, ...clientMessages];
@@ -105,13 +98,12 @@ ${contextText}`
 
     let assistantMessage = completion.choices[0].message;
     
-    // Handle tool calls
     while (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
       const toolResults: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [assistantMessage as any];
       for (const tc of assistantMessage.tool_calls) {
         const tcAny = tc as any;
         const args = JSON.parse(tcAny.function.arguments);
-        const result = executeTool(tcAny.function.name, args);
+        const result = await executeTool(tcAny.function.name, args);
         toolResults.push({ role: 'tool' as const, tool_call_id: tcAny.id, content: result });
       }
       
@@ -125,7 +117,6 @@ ${contextText}`
       assistantMessage = completion.choices[0].message;
     }
 
-    // Extract suggestions from the response
     const content = assistantMessage.content || '';
     const suggestions = content.match(/💡\s*(.+)/g)?.map((s: string) => s.replace(/💡\s*/, '').replace(/\*\*/g, '').trim()).slice(0, 3) || [];
 

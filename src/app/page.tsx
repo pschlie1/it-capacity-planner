@@ -1,5 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import CapacityWaterfall from '@/components/charts/CapacityWaterfall';
 import RedLineChart from '@/components/charts/RedLineChart';
@@ -103,6 +105,13 @@ const BV_COLORS: Record<string, string> = {
 };
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'unauthenticated') router.push('/login');
+  }, [status, router]);
+
   const [tab, setTab] = useState<Tab>('dashboard');
   const [teams, setTeams] = useState<Team[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -190,7 +199,7 @@ export default function Home() {
     ]},
   ];
 
-  if (loading) {
+  if (loading || status === 'loading' || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -290,6 +299,8 @@ export default function Home() {
             <span className="flex items-center gap-1"><FolderKanban className="w-3 h-3" />{activeProjects} Active</span>
             {atRiskProjects > 0 && <span className="flex items-center gap-1 text-red-400"><AlertTriangle className="w-3 h-3" />{atRiskProjects} At Risk</span>}
             <span className="hidden md:inline text-[10px] text-muted-foreground/50">Press 1-8 for nav · [ toggle sidebar</span>
+            <span className="text-xs text-muted-foreground">{session.user.name || session.user.email}</span>
+            <button onClick={() => signOut()} className="text-[10px] px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground">Sign Out</button>
           </div>
         </header>
 

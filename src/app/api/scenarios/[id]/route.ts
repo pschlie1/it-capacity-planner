@@ -1,19 +1,25 @@
-import { updateScenario, deleteScenario, setPriorityOverrides, getPriorityOverrides, getContractors, getTeams } from '@/lib/store';
 import { NextResponse } from 'next/server';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as scenarioService from '@/lib/services/scenarios';
+
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  const scenario = await scenarioService.getScenario(auth.orgId, params.id);
+  return scenario ? NextResponse.json(scenario) : NextResponse.json({ error: 'Not found' }, { status: 404 });
+}
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
   const data = await req.json();
-  if (data.priorityOverrides) setPriorityOverrides(params.id, data.priorityOverrides);
-  const scenario = updateScenario(params.id, { name: data.name, locked: data.locked });
-  const teams = getTeams();
-  return NextResponse.json({
-    ...scenario,
-    priorityOverrides: getPriorityOverrides(params.id),
-    contractors: getContractors(params.id).map(c => ({ ...c, team: teams.find(t => t.id === c.teamId) })),
-  });
+  const scenario = await scenarioService.updateScenario(auth.orgId, auth.user.id, params.id, data);
+  return scenario ? NextResponse.json(scenario) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  deleteScenario(params.id);
-  return NextResponse.json({ success: true });
+  const auth = await requireAuth('ADMIN');
+  if (isAuthError(auth)) return auth;
+  const ok = await scenarioService.deleteScenario(auth.orgId, auth.user.id, params.id);
+  return ok ? NextResponse.json({ success: true }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }

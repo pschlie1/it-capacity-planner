@@ -1,26 +1,21 @@
-import { getProjects, getTeamEstimates, getTeams, createProject, setTeamEstimates } from '@/lib/store';
 import { NextResponse } from 'next/server';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as projectService from '@/lib/services/projects';
+import { projectCreateSchema } from '@/lib/schemas';
 
 export async function GET() {
-  const projects = getProjects();
-  const teams = getTeams();
-  const allEstimates = getTeamEstimates();
-  
-  const result = projects.map(p => ({
-    ...p,
-    teamEstimates: allEstimates.filter(te => te.projectId === p.id).map(te => ({
-      ...te,
-      team: teams.find(t => t.id === te.teamId),
-    })),
-  }));
-  return NextResponse.json(result);
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  const projects = await projectService.getProjects(auth.orgId);
+  return NextResponse.json(projects);
 }
 
 export async function POST(req: Request) {
-  const { teamEstimates, ...data } = await req.json();
-  const project = createProject(data);
-  if (teamEstimates) {
-    setTeamEstimates(project.id, teamEstimates);
-  }
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
+  const body = await req.json();
+  const parsed = projectCreateSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const project = await projectService.createProject(auth.orgId, auth.user.id, body);
   return NextResponse.json(project);
 }

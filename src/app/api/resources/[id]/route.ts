@@ -1,35 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getResource, updateResource, getAssignments, getResourceWeeklyUtilization, getProjectSkillRequirements } from '@/lib/resource-store';
-import { getStore } from '@/lib/store';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as resourceService from '@/lib/services/resources';
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const resource = getResource(params.id);
-  if (!resource) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const teams = getStore().teams;
-  const projects = getStore().projects;
-  const assignments = getAssignments({ resourceId: params.id });
-  const team = teams.find(t => t.id === resource.teamId);
-  const utilization = getResourceWeeklyUtilization(params.id);
-
-  const enrichedAssignments = assignments.map(a => {
-    const project = projects.find(p => p.id === a.projectId);
-    return { ...a, projectName: project?.name || 'Unknown', projectStatus: project?.status };
-  });
-
-  return NextResponse.json({
-    ...resource,
-    teamName: team?.name || 'Unknown',
-    assignments: enrichedAssignments,
-    utilization,
-    avgUtilization: utilization.reduce((a, b) => a + b, 0) / 52,
-    maxUtilization: Math.max(...utilization),
-  });
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  const resource = await resourceService.getResource(auth.orgId, params.id);
+  return resource ? NextResponse.json(resource) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
   const data = await req.json();
-  const resource = updateResource(params.id, data);
-  if (!resource) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  return NextResponse.json(resource);
+  const resource = await resourceService.updateResource(auth.orgId, auth.user.id, params.id, data);
+  return resource ? NextResponse.json(resource) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }

@@ -1,14 +1,17 @@
+import { requireAuth, isAuthError } from '@/lib/api-auth';
 import { checkRateLimit, getRateLimitResponse, getClientIp } from '@/lib/api-utils';
 import { NextResponse } from 'next/server';
 import { buildAIContext } from '@/lib/ai-context';
 import OpenAI from 'openai';
 
 export async function GET(req: Request) {
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
   const ip = getClientIp(req);
   const { allowed } = checkRateLimit(ip, 30);
   if (!allowed) return getRateLimitResponse();
 
-  const { contextText, data } = buildAIContext();
+  const { contextText, data } = await buildAIContext(auth.orgId);
 
   // Generate seed insights from data even without API key
   const seedInsights: any[] = [];

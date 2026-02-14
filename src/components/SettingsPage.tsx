@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Save, Calendar, Clock, AlertTriangle, Users, Upload, Download } from 'lucide-react';
+import { Save, Calendar, Clock, AlertTriangle, Users, Upload, Download, Shield, UserPlus, Trash2, History } from 'lucide-react';
 
 interface Settings {
   fiscalYearStartMonth: number;
@@ -9,6 +10,136 @@ interface Settings {
   holidays: { name: string; week: number }[];
   capacityThresholds: { amber: number; red: number };
   roleTemplates: { name: string; roles: Record<string, number> }[];
+}
+
+function UserManagement() {
+  const { data: session } = useSession();
+  const [users, setUsers] = useState<any[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', name: '', role: 'MEMBER', password: 'changeme123' });
+
+  const isAdmin = session?.user?.role === 'OWNER' || session?.user?.role === 'ADMIN';
+
+  useEffect(() => {
+    if (isAdmin) fetch('/api/users').then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
+  }, [isAdmin]);
+
+  if (!isAdmin) return null;
+
+  const addUser = async () => {
+    const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newUser) });
+    if (res.ok) { setShowAdd(false); setNewUser({ email: '', name: '', role: 'MEMBER', password: 'changeme123' }); fetch('/api/users').then(r => r.json()).then(setUsers); }
+  };
+
+  const changeRole = async (id: string, role: string) => {
+    await fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+    fetch('/api/users').then(r => r.json()).then(setUsers);
+  };
+
+  const removeUser = async (id: string) => {
+    if (!confirm('Remove this user?')) return;
+    await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    fetch('/api/users').then(r => r.json()).then(setUsers);
+  };
+
+  const ROLES = ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'];
+  const ROLE_COLORS: Record<string, string> = { OWNER: 'text-red-400', ADMIN: 'text-amber-400', MEMBER: 'text-blue-400', VIEWER: 'text-slate-400' };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><Shield className="w-4 h-4" /> User Management</CardTitle>
+        <CardDescription>Manage team members and their access levels</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {users.map(u => (
+            <div key={u.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
+              <div>
+                <p className="text-sm font-medium">{u.name || u.email}</p>
+                <p className="text-xs text-muted-foreground">{u.email}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select value={u.role} onChange={e => changeRole(u.id, e.target.value)}
+                  disabled={u.id === session?.user?.id}
+                  className="px-2 py-1 text-xs rounded bg-muted border border-border">
+                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <span className={`text-xs font-medium ${ROLE_COLORS[u.role]}`}>{u.role}</span>
+                {u.id !== session?.user?.id && session?.user?.role === 'OWNER' && (
+                  <button onClick={() => removeUser(u.id)} className="p-1 text-red-400 hover:bg-muted rounded"><Trash2 className="w-3 h-3" /></button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {showAdd ? (
+          <div className="mt-4 p-3 rounded-lg border border-border bg-muted/20">
+            <div className="grid grid-cols-4 gap-2">
+              <input value={newUser.email} onChange={e => setNewUser(n => ({ ...n, email: e.target.value }))} placeholder="Email" className="px-2 py-1 text-xs rounded bg-muted border border-border" />
+              <input value={newUser.name} onChange={e => setNewUser(n => ({ ...n, name: e.target.value }))} placeholder="Name" className="px-2 py-1 text-xs rounded bg-muted border border-border" />
+              <select value={newUser.role} onChange={e => setNewUser(n => ({ ...n, role: e.target.value }))} className="px-2 py-1 text-xs rounded bg-muted border border-border">
+                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <div className="flex gap-1">
+                <button onClick={addUser} className="px-3 py-1 text-xs rounded bg-primary text-primary-foreground">Add</button>
+                <button onClick={() => setShowAdd(false)} className="px-3 py-1 text-xs rounded border border-border text-muted-foreground">Cancel</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowAdd(true)} className="mt-3 flex items-center gap-1 text-xs text-primary hover:underline">
+            <UserPlus className="w-3 h-3" /> Add User
+          </button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AuditLogViewer() {
+  const { data: session } = useSession();
+  const [logs, setLogs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  const isAdmin = session?.user?.role === 'OWNER' || session?.user?.role === 'ADMIN';
+
+  useEffect(() => {
+    if (isAdmin) {
+      setLoading(true);
+      fetch('/api/audit?limit=30').then(r => r.ok ? r.json() : { logs: [], total: 0 }).then(d => { setLogs(d.logs); setTotal(d.total); setLoading(false); }).catch(() => setLoading(false));
+    }
+  }, [isAdmin]);
+
+  if (!isAdmin) return null;
+
+  const ACTION_COLORS: Record<string, string> = { CREATE: 'text-green-400', UPDATE: 'text-blue-400', DELETE: 'text-red-400' };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><History className="w-4 h-4" /> Audit Log</CardTitle>
+        <CardDescription>Recent changes ({total} total entries)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? <p className="text-xs text-muted-foreground">Loading...</p> : (
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {logs.map((log: any) => (
+              <div key={log.id} className="flex items-center gap-3 text-xs py-1.5 border-b border-border/50">
+                <span className={`font-mono font-medium ${ACTION_COLORS[log.action] || ''}`}>{log.action}</span>
+                <span className="text-muted-foreground">{log.entity}</span>
+                <span className="flex-1 text-muted-foreground truncate">{log.user?.name || log.user?.email}</span>
+                <span className="text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</span>
+              </div>
+            ))}
+            {logs.length === 0 && <p className="text-xs text-muted-foreground">No audit entries yet.</p>}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function SettingsPage() {
@@ -140,6 +271,12 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* User Management */}
+      <UserManagement />
+
+      {/* Audit Log */}
+      <AuditLogViewer />
 
       {/* Data Import/Export */}
       <Card>

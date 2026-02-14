@@ -1,32 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getAssignments, createAssignment, deleteAssignment } from '@/lib/resource-store';
-import { getStore } from '@/lib/store';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as resourceService from '@/lib/services/resources';
 
 export async function GET(req: Request) {
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
   const { searchParams } = new URL(req.url);
   const resourceId = searchParams.get('resourceId') || undefined;
   const projectId = searchParams.get('projectId') || undefined;
-  const assignments = getAssignments({ resourceId, projectId });
-  const projects = getStore().projects;
-  const resources = (await import('@/lib/resource-store')).getResources();
-
-  const enriched = assignments.map(a => ({
-    ...a,
-    projectName: projects.find(p => p.id === a.projectId)?.name || 'Unknown',
-    resourceName: resources.find(r => r.id === a.resourceId)?.name || 'Unknown',
-  }));
-
-  return NextResponse.json(enriched);
+  const assignments = await resourceService.getAssignments(auth.orgId, { resourceId, projectId });
+  return NextResponse.json(assignments);
 }
 
 export async function POST(req: Request) {
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
   const data = await req.json();
-  const assignment = createAssignment(data);
-  return NextResponse.json(assignment, { status: 201 });
+  const assignment = await resourceService.createAssignment(auth.orgId, auth.user.id, data);
+  return NextResponse.json(assignment);
 }
 
 export async function DELETE(req: Request) {
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
   const { id } = await req.json();
-  deleteAssignment(id);
-  return NextResponse.json({ ok: true });
+  const ok = await resourceService.deleteAssignment(auth.orgId, auth.user.id, id);
+  return ok ? NextResponse.json({ success: true }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }

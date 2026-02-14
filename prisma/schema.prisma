@@ -4,11 +4,105 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
+// ============================================
+// Multi-Tenancy
+// ============================================
+
+model Organization {
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  fiscalYearStartMonth Int      @default(1)
+  defaultHoursPerWeek  Int      @default(40)
+  capacityAmber        Int      @default(75)
+  capacityRed          Int      @default(90)
+  holidays             String   @default("[]") // JSON array
+  roleTemplates        String   @default("[]") // JSON array
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  users           User[]
+  teams           Team[]
+  projects        Project[]
+  resources       Resource[]
+  scenarios       Scenario[]
+  teamEstimates   TeamEstimate[]
+  assignments     ResourceAssignment[]
+  contractors     Contractor[]
+  priorityOverrides PriorityOverride[]
+  ptoEntries      PTOEntry[]
+  newHires        NewHire[]
+  actuals         ActualEntry[]
+  auditLogs       AuditLog[]
+  skillRequirements ProjectSkillRequirement[]
+
+  @@index([slug])
+}
+
+// ============================================
+// Auth & Users
+// ============================================
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  passwordHash   String
+  role           String   @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
+  lastActiveAt   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  auditLogs AuditLog[]
+
+  @@index([orgId])
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// Core Data Models
+// ============================================
+
 model Team {
-  id                 String   @id @default(uuid())
+  id                 String   @id @default(cuid())
   name               String
   pmFte              Float    @default(0)
   productManagerFte  Float    @default(0)
@@ -22,29 +116,60 @@ model Team {
   dbaFte             Float    @default(0)
   kloTlmHoursPerWeek Float    @default(0)
   adminPct           Float    @default(25)
+  skills             String   @default("[]") // JSON array of strings
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   teamEstimates TeamEstimate[]
   contractors   Contractor[]
+  resources     Resource[]
+  ptoEntries    PTOEntry[]
+  newHires      NewHire[]
+  actuals       ActualEntry[]
+
+  @@index([orgId])
 }
 
 model Project {
-  id              String   @id @default(uuid())
+  id              String   @id @default(cuid())
   name            String
   priority        Int
-  status          String   @default("proposed")
+  status          String   @default("not_started")
   startWeekOffset Int      @default(0)
   description     String   @default("")
+  tshirtSize      String?
+  category        String?
+  sponsor         String?
+  businessValue   String?
+  requiredSkills  String   @default("[]") // JSON array
+  dependencies    String   @default("[]") // JSON array of project IDs
+  milestones      String   @default("[]") // JSON array
+  actualHours     String   @default("{}") // JSON object
+  quarterTarget   String?
+  riskLevel       String?
+  riskNotes       String?
+  committedDate   String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  teamEstimates    TeamEstimate[]
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  teamEstimates     TeamEstimate[]
   priorityOverrides PriorityOverride[]
+  actuals           ActualEntry[]
+  assignments       ResourceAssignment[]
+  skillRequirements ProjectSkillRequirement[]
+
+  @@index([orgId])
+  @@index([orgId, priority])
 }
 
 model TeamEstimate {
-  id          String @id @default(uuid())
+  id          String @id @default(cuid())
   projectId   String
   teamId      String
   design      Float  @default(0)
@@ -52,38 +177,53 @@ model TeamEstimate {
   testing     Float  @default(0)
   deployment  Float  @default(0)
   postDeploy  Float  @default(0)
+  roleBreakdown String @default("{}") // JSON
+  confidence  String? // high, medium, low
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   team    Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, teamId])
+  @@index([orgId])
 }
 
 model Scenario {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   name      String
   locked    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   priorityOverrides PriorityOverride[]
   contractors       Contractor[]
+
+  @@index([orgId])
 }
 
 model PriorityOverride {
-  id         String @id @default(uuid())
+  id         String @id @default(cuid())
   scenarioId String
   projectId  String
   priority   Int
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   scenario Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
   project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([scenarioId, projectId])
+  @@index([orgId])
 }
 
 model Contractor {
-  id         String @id @default(uuid())
+  id         String @id @default(cuid())
   scenarioId String
   teamId     String
   roleKey    String
@@ -92,6 +232,153 @@ model Contractor {
   label      String
   startWeek  Int    @default(0)
 
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   scenario Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
   team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+// ============================================
+// Resources & Assignments
+// ============================================
+
+model Resource {
+  id               String   @id @default(cuid())
+  name             String
+  title            String
+  roleType         String
+  seniority        String
+  hireDate         String
+  hourlyCostRate   Float    @default(0)
+  baseHoursPerWeek Float    @default(40)
+  skills           String   @default("[]") // JSON array of {name, proficiency}
+  ptoBlocks        String   @default("[]") // JSON array
+  avatarColor      String   @default("#3b82f6")
+  email            String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  teamId String
+  team   Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  assignments ResourceAssignment[]
+
+  @@index([orgId])
+  @@index([teamId])
+}
+
+model ResourceAssignment {
+  id            String @id @default(cuid())
+  resourceId    String
+  projectId     String
+  role          String
+  allocationPct Float
+  startWeek     Int
+  endWeek       Int
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([resourceId])
+  @@index([projectId])
+}
+
+model ProjectSkillRequirement {
+  id              String @id @default(cuid())
+  projectId       String
+  skillName       String
+  minProficiency  Int
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([projectId])
+}
+
+// ============================================
+// Workforce Planning
+// ============================================
+
+model PTOEntry {
+  id           String @id @default(cuid())
+  teamId       String
+  role         String
+  personName   String
+  startWeek    Int
+  endWeek      Int
+  hoursPerWeek Float
+  reason       String
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  team  Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+model NewHire {
+  id         String @id @default(cuid())
+  teamId     String
+  role       String
+  personName String
+  startWeek  Int
+  rampWeeks  Int
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  team  Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+model ActualEntry {
+  id        String @id @default(cuid())
+  projectId String
+  teamId    String
+  phase     String
+  week      Int
+  hours     Float
+  notes     String?
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team    Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([projectId])
+}
+
+// ============================================
+// Audit Log
+// ============================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // CREATE, UPDATE, DELETE
+  entity    String   // Team, Project, Resource, etc.
+  entityId  String
+  changes   String?  // JSON before/after diff
+  createdAt DateTime @default(now())
+
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId String
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([orgId, entity])
+  @@index([orgId, createdAt])
 }

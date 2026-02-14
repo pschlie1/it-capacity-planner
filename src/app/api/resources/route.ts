@@ -1,40 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getResources, createResource, getAssignments, getResourceWeeklyUtilization } from '@/lib/resource-store';
-import { getStore } from '@/lib/store';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
+import * as resourceService from '@/lib/services/resources';
 
 export async function GET() {
-  const resources = getResources();
-  const teams = getStore().teams;
-  const projects = getStore().projects;
-  const assignments = getAssignments();
-
-  const enriched = resources.map(r => {
-    const team = teams.find(t => t.id === r.teamId);
-    const resourceAssignments = assignments.filter(a => a.resourceId === r.id).map(a => {
-      const project = projects.find(p => p.id === a.projectId);
-      return { ...a, projectName: project?.name || 'Unknown' };
-    });
-    const utilization = getResourceWeeklyUtilization(r.id);
-    const avgUtilization = utilization.reduce((a, b) => a + b, 0) / 52;
-    const maxUtilization = Math.max(...utilization);
-    const currentWeekUtil = utilization[0] || 0;
-
-    return {
-      ...r,
-      teamName: team?.name || 'Unknown',
-      assignments: resourceAssignments,
-      utilization,
-      avgUtilization,
-      maxUtilization,
-      currentWeekUtil,
-    };
-  });
-
-  return NextResponse.json(enriched);
+  const auth = await requireAuth();
+  if (isAuthError(auth)) return auth;
+  const resources = await resourceService.getResources(auth.orgId);
+  return NextResponse.json(resources);
 }
 
 export async function POST(req: Request) {
+  const auth = await requireAuth('MEMBER');
+  if (isAuthError(auth)) return auth;
   const data = await req.json();
-  const resource = createResource(data);
-  return NextResponse.json(resource, { status: 201 });
+  const resource = await resourceService.createResource(auth.orgId, auth.user.id, data);
+  return NextResponse.json(resource);
 }
