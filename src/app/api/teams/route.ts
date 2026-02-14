@@ -1,13 +1,12 @@
-import { prisma } from '@/lib/db';
+import { getTeams, createTeam } from '@/lib/store';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const teams = await prisma.team.findMany({ orderBy: { name: 'asc' }, include: { contractors: true } });
-  return NextResponse.json(teams);
+  return NextResponse.json(getTeams());
 }
 
 export async function POST(req: Request) {
   const data = await req.json();
-  const team = await prisma.team.create({ data });
+  const team = createTeam(data);
   return NextResponse.json(team);
 }

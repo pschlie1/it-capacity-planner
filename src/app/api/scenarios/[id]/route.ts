@@ -1,27 +1,19 @@
-import { prisma } from '@/lib/db';
+import { updateScenario, deleteScenario, setPriorityOverrides, getPriorityOverrides, getContractors, getTeams } from '@/lib/store';
 import { NextResponse } from 'next/server';
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const data = await req.json();
-  
-  if (data.priorityOverrides) {
-    await prisma.priorityOverride.deleteMany({ where: { scenarioId: params.id } });
-    for (const po of data.priorityOverrides) {
-      await prisma.priorityOverride.create({
-        data: { scenarioId: params.id, projectId: po.projectId, priority: po.priority },
-      });
-    }
-  }
-
-  const scenario = await prisma.scenario.update({
-    where: { id: params.id },
-    data: { name: data.name, locked: data.locked },
-    include: { priorityOverrides: true, contractors: { include: { team: true } } },
+  if (data.priorityOverrides) setPriorityOverrides(params.id, data.priorityOverrides);
+  const scenario = updateScenario(params.id, { name: data.name, locked: data.locked });
+  const teams = getTeams();
+  return NextResponse.json({
+    ...scenario,
+    priorityOverrides: getPriorityOverrides(params.id),
+    contractors: getContractors(params.id).map(c => ({ ...c, team: teams.find(t => t.id === c.teamId) })),
   });
-  return NextResponse.json(scenario);
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  await prisma.scenario.delete({ where: { id: params.id } });
+  deleteScenario(params.id);
   return NextResponse.json({ success: true });
 }
