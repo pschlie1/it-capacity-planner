@@ -11,13 +11,18 @@ import AiAnalyst from '@/components/AiAnalyst';
 import PortfolioDashboard from '@/components/PortfolioDashboard';
 import ReportsPage from '@/components/ReportsPage';
 import SettingsPage from '@/components/SettingsPage';
+import ResourceDirectory from '@/components/ResourceDirectory';
+import ResourceDetail from '@/components/ResourceDetail';
+import SkillsMatrix from '@/components/SkillsMatrix';
+import ResourceAnalytics from '@/components/ResourceAnalytics';
 import {
   BarChart3, Users, FolderKanban, Sparkles, TrendingUp, AlertTriangle,
   CheckCircle2, XCircle, Plus, Trash2, Lock, Unlock, ChevronDown, X, Edit2, Save,
   Layers, Brain, ArrowUpDown, LayoutDashboard, FileText, Settings, Search,
   ChevronRight, Calendar, Clock, Target, Zap, Shield, DollarSign,
   Activity, PieChart, ArrowUp, ArrowDown, Filter, Download, Upload,
-  UserPlus, UserMinus, Eye, MoreHorizontal, Flag, Hash, Gauge
+  UserPlus, UserMinus, Eye, MoreHorizontal, Flag, Hash, Gauge,
+  UserCheck, Grid3X3, BarChart2
 } from 'lucide-react';
 
 interface Team {
@@ -66,7 +71,7 @@ interface TeamCapacity {
   roles?: Record<string, { fte: number; hoursPerWeek: number }>;
 }
 
-type Tab = 'dashboard' | 'portfolio' | 'teams' | 'projects' | 'scenarios' | 'ai' | 'reports' | 'settings';
+type Tab = 'dashboard' | 'portfolio' | 'teams' | 'resources' | 'skills' | 'projects' | 'scenarios' | 'ai' | 'reports' | 'resource-analytics' | 'settings';
 
 const STATUS_COLORS: Record<string, string> = {
   not_started: 'bg-slate-500/20 text-slate-400',
@@ -102,6 +107,7 @@ export default function Home() {
   const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const [teamsRes, projectsRes, scenariosRes] = await Promise.all([
@@ -158,12 +164,15 @@ export default function Home() {
     ]},
     { label: 'Planning', items: [
       { id: 'teams' as Tab, label: 'Teams', icon: <Users className="w-4 h-4" />, badge: `${teams.length}` },
+      { id: 'resources' as Tab, label: 'Resources', icon: <UserCheck className="w-4 h-4" />, badge: null },
+      { id: 'skills' as Tab, label: 'Skills Matrix', icon: <Grid3X3 className="w-4 h-4" />, badge: null },
       { id: 'projects' as Tab, label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, badge: `${projects.length}` },
       { id: 'scenarios' as Tab, label: 'Scenarios', icon: <Layers className="w-4 h-4" />, badge: `${scenarios.length}` },
     ]},
     { label: 'Intelligence', items: [
       { id: 'ai' as Tab, label: 'AI Analyst', icon: <Brain className="w-4 h-4" />, badge: null },
       { id: 'reports' as Tab, label: 'Reports', icon: <FileText className="w-4 h-4" />, badge: null },
+      { id: 'resource-analytics' as Tab, label: 'People Analytics', icon: <BarChart2 className="w-4 h-4" />, badge: null },
     ]},
     { label: 'System', items: [
       { id: 'settings' as Tab, label: 'Settings', icon: <Settings className="w-4 h-4" />, badge: null },
@@ -225,7 +234,7 @@ export default function Home() {
               {section.items.map(item => (
                 <button
                   key={item.id}
-                  onClick={() => setTab(item.id)}
+                  onClick={() => { setTab(item.id); if (item.id !== 'resources') setSelectedResourceId(null); }}
                   className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ${
                     tab === item.id
                       ? 'bg-primary/10 text-primary border-r-2 border-primary'
@@ -280,6 +289,13 @@ export default function Home() {
             teams={teams} projects={projects} totalFte={totalFte}
           />}
           {tab === 'portfolio' && <PortfolioDashboard projects={projects} allocations={allocations} teams={teams} teamCapacities={teamCapacities} />}
+          {tab === 'resources' && (
+            selectedResourceId
+              ? <ResourceDetail resourceId={selectedResourceId} onBack={() => setSelectedResourceId(null)} />
+              : <ResourceDirectory onSelectResource={(id) => setSelectedResourceId(id)} />
+          )}
+          {tab === 'skills' && <SkillsMatrix />}
+          {tab === 'resource-analytics' && <ResourceAnalytics />}
           {tab === 'teams' && <TeamsTab teams={teams} onRefresh={fetchData} />}
           {tab === 'projects' && <ProjectsTab projects={projects} teams={teams} onRefresh={fetchData} />}
           {tab === 'scenarios' && <ScenariosTab scenarios={scenarios} teams={teams} projects={projects} onRefresh={fetchData} />}
