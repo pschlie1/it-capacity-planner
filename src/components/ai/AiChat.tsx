@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Loader2, RotateCcw, Zap } from 'lucide-react';
 
@@ -41,7 +42,7 @@ export default function AiChat() {
     setSuggestions([]);
 
     try {
-      const res = await fetch('/api/ai/chat', {
+      const res = await csrfFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages }),

@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState } from 'react';
 import { Sparkles, Loader2, FileText, Download, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 
@@ -24,7 +25,7 @@ export default function AiBriefing() {
   const generate = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/ai/briefing', { method: 'POST' });
+      const res = await csrfFetch('/api/ai/briefing', { method: 'POST' });
       const data = await res.json();
       setBriefing(data.briefing);
     } catch {}

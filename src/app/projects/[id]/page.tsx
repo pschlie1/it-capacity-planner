@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -75,11 +76,11 @@ export default function ProjectDetailPage() {
   }, [id]);
 
   const saveActual = async () => {
-    await fetch('/api/actuals', {
+    await csrfFetch('/api/actuals', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...actualForm, projectId: id }),
     });
-    const acts = await fetch(`/api/actuals?projectId=${id}`).then(r => r.ok ? r.json() : []);
+    const acts = await csrfFetch(`/api/actuals?projectId=${id}`).then(r => r.ok ? r.json() : []);
     setActuals(acts);
     setShowActualForm(false);
     setActualForm({ teamId: '', phase: 'design', week: 1, hours: 0 });
@@ -162,7 +163,7 @@ export default function ProjectDetailPage() {
             <button onClick={() => router.push('/')} className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted">
               <Edit2 className="w-3 h-3" /> Edit
             </button>
-            <button onClick={async () => { if (!confirm('Delete?')) return; await fetch(`/api/projects/${id}`, { method: 'DELETE' }); router.push('/'); }}
+            <button onClick={async () => { if (!confirm('Delete?')) return; await csrfFetch(`/api/projects/${id}`, { method: 'DELETE' }); router.push('/'); }}
               className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10">
               <Trash2 className="w-3 h-3" /> Delete
             </button>

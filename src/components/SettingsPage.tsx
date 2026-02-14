@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -37,18 +38,18 @@ function UserManagement() {
   if (!isAdmin) return null;
 
   const addUser = async () => {
-    const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newUser) });
+    const res = await csrfFetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newUser) });
     if (res.ok) { setShowAdd(false); setNewUser({ email: '', name: '', role: 'MEMBER', password: 'changeme123' }); fetch('/api/users').then(r => r.json()).then(setUsers); }
   };
 
   const changeRole = async (id: string, role: string) => {
-    await fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+    await csrfFetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
     fetch('/api/users').then(r => r.json()).then(setUsers);
   };
 
   const removeUser = async (id: string) => {
     if (!confirm('Remove this user?')) return;
-    await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    await csrfFetch(`/api/users/${id}`, { method: 'DELETE' });
     fetch('/api/users').then(r => r.json()).then(setUsers);
   };
 
@@ -162,7 +163,7 @@ export default function SettingsPage() {
 
   const save = async () => {
     if (!settings) return;
-    await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+    await csrfFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

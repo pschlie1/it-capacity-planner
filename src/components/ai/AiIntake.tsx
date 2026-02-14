@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState } from 'react';
 import { Sparkles, Loader2, Plus, Edit2, Check } from 'lucide-react';
 
@@ -27,7 +28,7 @@ export default function AiIntake({ onProjectAdded }: { onProjectAdded?: () => vo
     setProject(null);
     setAdded(false);
     try {
-      const res = await fetch('/api/ai/intake', {
+      const res = await csrfFetch('/api/ai/intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description }),
@@ -43,7 +44,7 @@ export default function AiIntake({ onProjectAdded }: { onProjectAdded?: () => vo
   const addToPortfolio = async () => {
     if (!project) return;
     try {
-      const res = await fetch('/api/projects', {
+      const res = await csrfFetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

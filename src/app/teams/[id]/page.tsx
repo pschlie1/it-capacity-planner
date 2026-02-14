@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -71,8 +72,8 @@ export default function TeamDetailPage() {
 
   const saveEdit = async () => {
     const { id: _id, ...data } = form as Team;
-    await fetch(`/api/teams/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    const updated = await fetch(`/api/teams/${id}`).then(r => r.json());
+    await csrfFetch(`/api/teams/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const updated = await csrfFetch(`/api/teams/${id}`).then(r => r.json());
     setTeam(updated);
     setForm(updated);
     setEditing(false);
@@ -80,7 +81,7 @@ export default function TeamDetailPage() {
 
   const deleteTeam = async () => {
     if (!confirm('Delete this team? This action cannot be undone.')) return;
-    await fetch(`/api/teams/${id}`, { method: 'DELETE' });
+    await csrfFetch(`/api/teams/${id}`, { method: 'DELETE' });
     router.push('/');
   };
 

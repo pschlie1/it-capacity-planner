@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState } from 'react';
 import { Sparkles, Loader2, PlayCircle, CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 
@@ -33,7 +34,7 @@ export default function AiReview() {
   const runReview = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/ai/review', { method: 'POST' });
+      const res = await csrfFetch('/api/ai/review', { method: 'POST' });
       const data = await res.json();
       setReview(data.review);
     } catch {}

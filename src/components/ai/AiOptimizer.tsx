@@ -1,4 +1,5 @@
 'use client';
+import { csrfFetch } from '@/lib/csrf-client';
 import { useState } from 'react';
 import { Sparkles, Loader2, Zap, Users, UserPlus, DollarSign, Check, ArrowRight } from 'lucide-react';
 
@@ -28,7 +29,7 @@ export default function AiOptimizer({ onRefresh }: { onRefresh?: () => void }) {
     setRecommendations([]);
     setSummary('');
     try {
-      const res = await fetch('/api/ai/optimize', {
+      const res = await csrfFetch('/api/ai/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type }),

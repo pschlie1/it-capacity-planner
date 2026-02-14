@@ -13,6 +13,7 @@ import AiChat from '@/components/ai/AiChat';
 import AiIntake from '@/components/ai/AiIntake';
 import AiOptimizer from '@/components/ai/AiOptimizer';
 import AiBriefing from '@/components/ai/AiBriefing';
+import { csrfFetch } from '@/lib/csrf-client';
 import AiReview from '@/components/ai/AiReview';
 import AiInsightsFeed from '@/components/ai/AiInsightsFeed';
 import PortfolioDashboard from '@/components/PortfolioDashboard';
@@ -655,18 +656,18 @@ function TeamsTab({ teams, onRefresh }: { teams: Team[]; onRefresh: () => void }
   const saveEdit = async () => {
     if (!editing) return;
     const { id: _id, ...data } = form as Team;
-    await fetch(`/api/teams/${editing}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    await csrfFetch(`/api/teams/${editing}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     setEditing(null); onRefresh();
   };
 
   const deleteTeam = async (id: string) => {
     if (!confirm('Delete this team?')) return;
-    await fetch(`/api/teams/${id}`, { method: 'DELETE' });
+    await csrfFetch(`/api/teams/${id}`, { method: 'DELETE' });
     onRefresh();
   };
 
   const addTeam = async () => {
-    await fetch('/api/teams', {
+    await csrfFetch('/api/teams', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: form.name || 'New Team', architectFte: form.architectFte || 0, developerFte: form.developerFte || 0,
@@ -856,16 +857,16 @@ function ProjectsTab({ projects, teams, onRefresh }: { projects: Project[]; team
 
   const saveProject = async () => {
     if (editing) {
-      await fetch(`/api/projects/${editing}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      await csrfFetch(`/api/projects/${editing}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     } else {
-      await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      await csrfFetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     }
     setEditing(null); setShowAdd(false); onRefresh();
   };
 
   const deleteProject = async (id: string) => {
     if (!confirm('Delete this project?')) return;
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+    await csrfFetch(`/api/projects/${id}`, { method: 'DELETE' });
     onRefresh();
   };
 
@@ -1115,29 +1116,29 @@ function ScenariosTab({ scenarios, teams, projects, onRefresh }: { scenarios: Sc
   const [contractorForm, setContractorForm] = useState({ teamId: '', roleKey: 'developer', fte: 1, weeks: 12, label: '', startWeek: 0 });
 
   const createScenario = async () => {
-    await fetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Scenario' }) });
+    await csrfFetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Scenario' }) });
     setShowAdd(false); setNewName(''); onRefresh();
   };
 
   const deleteScenario = async (id: string) => {
     if (!confirm('Delete this scenario?')) return;
-    await fetch(`/api/scenarios/${id}`, { method: 'DELETE' });
+    await csrfFetch(`/api/scenarios/${id}`, { method: 'DELETE' });
     onRefresh();
   };
 
   const toggleLock = async (s: Scenario) => {
-    await fetch(`/api/scenarios/${s.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, locked: !s.locked }) });
+    await csrfFetch(`/api/scenarios/${s.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, locked: !s.locked }) });
     onRefresh();
   };
 
   const addContractor = async (scenarioId: string) => {
-    await fetch(`/api/scenarios/${scenarioId}/contractors`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contractorForm) });
+    await csrfFetch(`/api/scenarios/${scenarioId}/contractors`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contractorForm) });
     setContractorForm({ teamId: teams[0]?.id || '', roleKey: 'developer', fte: 1, weeks: 12, label: '', startWeek: 0 });
     onRefresh();
   };
 
   const removeContractor = async (scenarioId: string, contractorId: string) => {
-    await fetch(`/api/scenarios/${scenarioId}/contractors`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contractorId }) });
+    await csrfFetch(`/api/scenarios/${scenarioId}/contractors`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contractorId }) });
     onRefresh();
   };
 
