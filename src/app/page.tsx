@@ -7,7 +7,12 @@ import TeamUtilization from '@/components/charts/TeamUtilization';
 import GanttChart from '@/components/charts/GanttChart';
 import DemandSupplyChart from '@/components/charts/DemandSupplyChart';
 import RoleHeatmap from '@/components/charts/RoleHeatmap';
-import AiAnalyst from '@/components/AiAnalyst';
+import AiChat from '@/components/ai/AiChat';
+import AiIntake from '@/components/ai/AiIntake';
+import AiOptimizer from '@/components/ai/AiOptimizer';
+import AiBriefing from '@/components/ai/AiBriefing';
+import AiReview from '@/components/ai/AiReview';
+import AiInsightsFeed from '@/components/ai/AiInsightsFeed';
 import PortfolioDashboard from '@/components/PortfolioDashboard';
 import ReportsPage from '@/components/ReportsPage';
 import SettingsPage from '@/components/SettingsPage';
@@ -22,7 +27,7 @@ import {
   ChevronRight, Calendar, Clock, Target, Zap, Shield, DollarSign,
   Activity, PieChart, ArrowUp, ArrowDown, Filter, Download, Upload,
   UserPlus, UserMinus, Eye, MoreHorizontal, Flag, Hash, Gauge,
-  UserCheck, Grid3X3, BarChart2
+  UserCheck, Grid3X3, BarChart2, MessageSquare, Inbox, Lightbulb, PlayCircle, ClipboardList
 } from 'lucide-react';
 
 interface Team {
@@ -71,7 +76,7 @@ interface TeamCapacity {
   roles?: Record<string, { fte: number; hoursPerWeek: number }>;
 }
 
-type Tab = 'dashboard' | 'portfolio' | 'teams' | 'resources' | 'skills' | 'projects' | 'scenarios' | 'ai' | 'reports' | 'resource-analytics' | 'settings';
+type Tab = 'dashboard' | 'portfolio' | 'teams' | 'resources' | 'skills' | 'projects' | 'scenarios' | 'ai' | 'ai-intake' | 'ai-optimize' | 'ai-briefing' | 'ai-review' | 'reports' | 'resource-analytics' | 'settings';
 
 const STATUS_COLORS: Record<string, string> = {
   not_started: 'bg-slate-500/20 text-slate-400',
@@ -169,8 +174,14 @@ export default function Home() {
       { id: 'projects' as Tab, label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, badge: `${projects.length}` },
       { id: 'scenarios' as Tab, label: 'Scenarios', icon: <Layers className="w-4 h-4" />, badge: `${scenarios.length}` },
     ]},
+    { label: 'AI Hub', items: [
+      { id: 'ai' as Tab, label: 'Analyst Chat', icon: <MessageSquare className="w-4 h-4" />, badge: null },
+      { id: 'ai-intake' as Tab, label: 'Project Intake', icon: <Inbox className="w-4 h-4" />, badge: null },
+      { id: 'ai-optimize' as Tab, label: 'Optimizer', icon: <Zap className="w-4 h-4" />, badge: null },
+      { id: 'ai-briefing' as Tab, label: 'Executive Briefing', icon: <ClipboardList className="w-4 h-4" />, badge: null },
+      { id: 'ai-review' as Tab, label: 'Weekly Review', icon: <PlayCircle className="w-4 h-4" />, badge: null },
+    ]},
     { label: 'Intelligence', items: [
-      { id: 'ai' as Tab, label: 'AI Analyst', icon: <Brain className="w-4 h-4" />, badge: null },
       { id: 'reports' as Tab, label: 'Reports', icon: <FileText className="w-4 h-4" />, badge: null },
       { id: 'resource-analytics' as Tab, label: 'People Analytics', icon: <BarChart2 className="w-4 h-4" />, badge: null },
     ]},
@@ -287,6 +298,7 @@ export default function Home() {
             allocations={allocations} teamCapacities={teamCapacities}
             feasible={feasible} infeasible={infeasible} avgUtil={avgUtil} totalCapacity={totalCapacity}
             teams={teams} projects={projects} totalFte={totalFte}
+            onNavigate={(t: string) => setTab(t as Tab)}
           />}
           {tab === 'portfolio' && <PortfolioDashboard projects={projects} allocations={allocations} teams={teams} teamCapacities={teamCapacities} />}
           {tab === 'resources' && (
@@ -303,9 +315,45 @@ export default function Home() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> AI Capacity Analyst</CardTitle>
-                <CardDescription>Natural language analysis of your capacity data powered by AI</CardDescription>
+                <CardDescription>Multi-turn analysis with tool use — AI can read and modify your capacity data</CardDescription>
               </CardHeader>
-              <CardContent><AiAnalyst /></CardContent>
+              <CardContent><AiChat /></CardContent>
+            </Card>
+          )}
+          {tab === 'ai-intake' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Inbox className="w-5 h-5 text-primary" /> AI Project Intake</CardTitle>
+                <CardDescription>Describe a project in natural language and AI generates the complete record</CardDescription>
+              </CardHeader>
+              <CardContent><AiIntake onProjectAdded={fetchData} /></CardContent>
+            </Card>
+          )}
+          {tab === 'ai-optimize' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" /> AI Optimization Engine</CardTitle>
+                <CardDescription>AI-powered recommendations to optimize your portfolio, resources, hiring, and costs</CardDescription>
+              </CardHeader>
+              <CardContent><AiOptimizer onRefresh={fetchData} /></CardContent>
+            </Card>
+          )}
+          {tab === 'ai-briefing' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Executive Briefing</CardTitle>
+                <CardDescription>AI-generated board-ready capacity briefing from live data</CardDescription>
+              </CardHeader>
+              <CardContent><AiBriefing /></CardContent>
+            </Card>
+          )}
+          {tab === 'ai-review' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><PlayCircle className="w-5 h-5 text-primary" /> Weekly Capacity Review</CardTitle>
+                <CardDescription>Comprehensive AI review that replaces your weekly capacity meeting</CardDescription>
+              </CardHeader>
+              <CardContent><AiReview /></CardContent>
             </Card>
           )}
           {tab === 'reports' && <ReportsPage projects={projects} teams={teams} allocations={allocations} teamCapacities={teamCapacities} />}
@@ -317,10 +365,11 @@ export default function Home() {
 }
 
 // Dashboard Tab
-function DashboardTab({ allocations, teamCapacities, feasible, infeasible, avgUtil, totalCapacity, teams, projects, totalFte }: {
+function DashboardTab({ allocations, teamCapacities, feasible, infeasible, avgUtil, totalCapacity, teams, projects, totalFte, onNavigate }: {
   allocations: Allocation[]; teamCapacities: TeamCapacity[];
   feasible: number; infeasible: number; avgUtil: number; totalCapacity: number;
   teams: Team[]; projects: Project[]; totalFte: number;
+  onNavigate?: (tab: string) => void;
 }) {
   const criticalProjects = projects.filter(p => p.businessValue === 'critical');
   const totalEstimatedHours = projects.reduce((s, p) => s + p.teamEstimates.reduce((s2, te) => s2 + te.design + te.development + te.testing + te.deployment + te.postDeploy, 0), 0);
@@ -350,6 +399,13 @@ function DashboardTab({ allocations, teamCapacities, feasible, infeasible, avgUt
           </div>
         </div>
       )}
+
+      {/* AI Insights Feed */}
+      <Card>
+        <CardContent className="pt-4">
+          <AiInsightsFeed onNavigate={onNavigate} />
+        </CardContent>
+      </Card>
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

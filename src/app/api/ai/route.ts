@@ -4,7 +4,8 @@ import { runAllocationEngine, TeamData, ProjectData } from '@/lib/allocation-eng
 import OpenAI from 'openai';
 
 export async function POST(req: Request) {
-  const { message } = await req.json();
+  const body = await req.json();
+  const message = body.message;
 
   const teams = getTeams();
   const projects = getProjects();
