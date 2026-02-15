@@ -83,7 +83,11 @@ interface TeamCapacity {
   roles?: Record<string, { fte: number; hoursPerWeek: number }>;
 }
 
-type Tab = 'dashboard' | 'portfolio' | 'teams' | 'resources' | 'skills' | 'projects' | 'scenarios' | 'ai' | 'ai-intake' | 'ai-optimize' | 'ai-briefing' | 'ai-review' | 'reports' | 'resource-analytics' | 'settings' | 'pipeline' | 'estimation' | 'cost-approval';
+type Tab = 'dashboard' | 'projects' | 'people' | 'ai' | 'settings';
+type DashboardSub = 'overview' | 'reports' | 'analytics';
+type ProjectsSub = 'all' | 'pipeline' | 'estimation' | 'cost-approval';
+type PeopleSub = 'teams' | 'resources' | 'skills';
+type AiSub = 'chat' | 'intake' | 'optimize' | 'briefing' | 'review';
 
 const STATUS_COLORS: Record<string, string> = {
   not_started: 'bg-slate-500/20 text-slate-400',
@@ -129,6 +133,10 @@ export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [selectedPipelineProjectId, setSelectedPipelineProjectId] = useState<string | null>(null);
+  const [dashboardSub, setDashboardSub] = useState<DashboardSub>('overview');
+  const [projectsSub, setProjectsSub] = useState<ProjectsSub>('all');
+  const [peopleSub, setPeopleSub] = useState<PeopleSub>('teams');
+  const [aiSub, setAiSub] = useState<AiSub>('chat');
 
   const fetchData = useCallback(async () => {
     try {
@@ -166,13 +174,10 @@ export default function Home() {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === '1') setTab('dashboard');
-      if (e.key === '2') setTab('portfolio');
-      if (e.key === '3') setTab('teams');
-      if (e.key === '4') setTab('projects');
-      if (e.key === '5') setTab('scenarios');
-      if (e.key === '6') setTab('ai');
-      if (e.key === '7') setTab('reports');
-      if (e.key === '8') setTab('settings');
+      if (e.key === '2') setTab('projects');
+      if (e.key === '3') setTab('people');
+      if (e.key === '4') setTab('ai');
+      if (e.key === '5') setTab('settings');
       if (e.key === '[') setSidebarCollapsed(c => !c);
     };
     window.addEventListener('keydown', handler);
@@ -188,33 +193,12 @@ export default function Home() {
   const activeProjects = projects.filter(p => p.status === 'active').length;
   const atRiskProjects = projects.filter(p => p.riskLevel === 'high').length;
 
-  const navSections = [
-    { label: 'Overview', items: [
-      { id: 'dashboard' as Tab, label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" />, badge: null },
-      { id: 'portfolio' as Tab, label: 'Portfolio', icon: <PieChart className="w-4 h-4" />, badge: `${projects.length}` },
-    ]},
-    { label: 'Planning', items: [
-      { id: 'pipeline' as Tab, label: 'Pipeline', icon: <GitMerge className="w-4 h-4" />, badge: null },
-      { id: 'teams' as Tab, label: 'Teams', icon: <Users className="w-4 h-4" />, badge: `${teams.length}` },
-      { id: 'resources' as Tab, label: 'Resources', icon: <UserCheck className="w-4 h-4" />, badge: null },
-      { id: 'skills' as Tab, label: 'Skills Matrix', icon: <Grid3X3 className="w-4 h-4" />, badge: null },
-      { id: 'projects' as Tab, label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, badge: `${projects.length}` },
-      { id: 'scenarios' as Tab, label: 'Scenarios', icon: <Layers className="w-4 h-4" />, badge: `${scenarios.length}` },
-    ]},
-    { label: 'AI Hub', items: [
-      { id: 'ai' as Tab, label: 'Analyst Chat', icon: <MessageSquare className="w-4 h-4" />, badge: null },
-      { id: 'ai-intake' as Tab, label: 'Project Intake', icon: <Inbox className="w-4 h-4" />, badge: null },
-      { id: 'ai-optimize' as Tab, label: 'Optimizer', icon: <Zap className="w-4 h-4" />, badge: null },
-      { id: 'ai-briefing' as Tab, label: 'Executive Briefing', icon: <ClipboardList className="w-4 h-4" />, badge: null },
-      { id: 'ai-review' as Tab, label: 'Weekly Review', icon: <PlayCircle className="w-4 h-4" />, badge: null },
-    ]},
-    { label: 'Intelligence', items: [
-      { id: 'reports' as Tab, label: 'Reports', icon: <FileText className="w-4 h-4" />, badge: null },
-      { id: 'resource-analytics' as Tab, label: 'People Analytics', icon: <BarChart2 className="w-4 h-4" />, badge: null },
-    ]},
-    { label: 'System', items: [
-      { id: 'settings' as Tab, label: 'Settings', icon: <Settings className="w-4 h-4" />, badge: null },
-    ]},
+  const navItems = [
+    { id: 'dashboard' as Tab, label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'projects' as Tab, label: 'Projects', icon: <FolderKanban className="w-5 h-5" /> },
+    { id: 'people' as Tab, label: 'People', icon: <Users className="w-5 h-5" /> },
+    { id: 'ai' as Tab, label: 'AI', icon: <Sparkles className="w-5 h-5" /> },
+    { id: 'settings' as Tab, label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ];
 
   if (loading || status === 'loading' || !session) {
@@ -278,29 +262,23 @@ export default function Home() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-2">
-          {navSections.map(section => (
-            <div key={section.label} className="mb-2">
-              {/* Section label: show on mobile drawer and desktop expanded */}
-              <p className={`px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:block'} block`}>{section.label}</p>
-              {section.items.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => { setTab(item.id); if (item.id !== 'resources') setSelectedResourceId(null); setMobileOpen(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 text-sm transition-colors ${
-                    tab === item.id
-                      ? 'bg-primary/10 text-primary border-r-2 border-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  } ${sidebarCollapsed ? 'md:justify-center lg:justify-center' : 'md:justify-center lg:justify-start'}`}
-                  title={item.label}
-                >
-                  <span className="flex-shrink-0">{item.icon}</span>
-                  {/* Label: always on mobile drawer, hidden on tablet, shown on desktop expanded */}
-                  <span className={`flex-1 text-left ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:inline'} inline`}>{item.label}</span>
-                  {item.badge && <span className={`text-[10px] px-1.5 py-0.5 rounded-full bg-muted ${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:inline'} inline`}>{item.badge}</span>}
-                </button>
-              ))}
-            </div>
+        <nav className="flex-1 overflow-y-auto py-4 space-y-1">
+          {navItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => { setTab(item.id); setSelectedResourceId(null); setMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors rounded-lg mx-auto ${
+                sidebarCollapsed ? 'md:w-12 lg:w-12 md:px-0 md:justify-center' : 'md:w-12 md:px-0 md:justify-center lg:w-[calc(100%-16px)] lg:mx-2 lg:px-4 lg:justify-start'
+              } ${
+                tab === item.id
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title={item.label}
+            >
+              <span className="flex-shrink-0">{item.icon}</span>
+              <span className={`${sidebarCollapsed ? 'md:hidden lg:hidden' : 'md:hidden lg:inline'} inline`}>{item.label}</span>
+            </button>
           ))}
         </nav>
 
@@ -322,106 +300,201 @@ export default function Home() {
             <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-muted md:hidden flex-shrink-0">
               <Menu className="w-5 h-5" />
             </button>
-            <h2 className="text-base md:text-lg font-semibold truncate">{navSections.flatMap(s => s.items).find(i => i.id === tab)?.label}</h2>
-            {tab !== 'dashboard' && (
-              <span className="text-xs text-muted-foreground hidden sm:inline">/ {navSections.find(s => s.items.some(i => i.id === tab))?.label}</span>
-            )}
+            <h2 className="text-base md:text-lg font-semibold truncate">{navItems.find(i => i.id === tab)?.label}</h2>
           </div>
           <div className="flex items-center gap-2 md:gap-3 text-xs text-muted-foreground flex-shrink-0">
             <span className="hidden sm:flex items-center gap-1"><Users className="w-3 h-3" />{totalFte.toFixed(0)} FTE</span>
             <span className="hidden md:flex items-center gap-1"><FolderKanban className="w-3 h-3" />{activeProjects} Active</span>
             {atRiskProjects > 0 && <span className="hidden sm:flex items-center gap-1 text-red-400"><AlertTriangle className="w-3 h-3" />{atRiskProjects}</span>}
-            <span className="hidden lg:inline text-[10px] text-muted-foreground/50">Press 1-8 for nav · [ toggle sidebar</span>
+            <span className="hidden lg:inline text-[10px] text-muted-foreground/50">Press 1-5 for nav · [ toggle sidebar</span>
             <span className="text-xs text-muted-foreground hidden md:inline truncate max-w-[120px]">{session.user.name || session.user.email}</span>
             <button onClick={() => signOut()} className="text-[10px] px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground">Sign Out</button>
           </div>
         </header>
 
         <div className="p-3 md:p-6">
-          {tab === 'dashboard' && <DashboardTab
-            allocations={allocations} teamCapacities={teamCapacities}
-            feasible={feasible} infeasible={infeasible} avgUtil={avgUtil} totalCapacity={totalCapacity}
-            teams={teams} projects={projects} totalFte={totalFte}
-            onNavigate={(t: string) => setTab(t as Tab)}
-          />}
-          {tab === 'portfolio' && <PortfolioDashboard projects={projects} allocations={allocations} teams={teams} teamCapacities={teamCapacities} />}
-          {tab === 'resources' && (
-            selectedResourceId
-              ? <ResourceDetail resourceId={selectedResourceId} onBack={() => setSelectedResourceId(null)} />
-              : <ResourceDirectory onSelectResource={(id) => setSelectedResourceId(id)} />
+          {/* ── Dashboard ── */}
+          {tab === 'dashboard' && (
+            <div className="space-y-6">
+              <SubNav<DashboardSub>
+                active={dashboardSub}
+                onChange={setDashboardSub}
+                items={[
+                  { id: 'overview', label: 'Overview' },
+                  { id: 'reports', label: 'Reports' },
+                  { id: 'analytics', label: 'People Analytics' },
+                ]}
+              />
+              {dashboardSub === 'overview' && (
+                <DashboardTab
+                  allocations={allocations} teamCapacities={teamCapacities}
+                  feasible={feasible} infeasible={infeasible} avgUtil={avgUtil} totalCapacity={totalCapacity}
+                  teams={teams} projects={projects} totalFte={totalFte}
+                  onNavigate={(t: string) => setTab(t as Tab)}
+                />
+              )}
+              {dashboardSub === 'reports' && <ReportsPage projects={projects} teams={teams} allocations={allocations} teamCapacities={teamCapacities} />}
+              {dashboardSub === 'analytics' && <ResourceAnalytics />}
+            </div>
           )}
-          {tab === 'skills' && <SkillsMatrix />}
-          {tab === 'resource-analytics' && <ResourceAnalytics />}
-          {tab === 'teams' && <TeamsTab teams={teams} onRefresh={fetchData} />}
-          {tab === 'projects' && <ProjectsTab projects={projects} teams={teams} onRefresh={fetchData} />}
-          {tab === 'scenarios' && <ScenariosTab scenarios={scenarios} teams={teams} projects={projects} onRefresh={fetchData} />}
+
+          {/* ── Projects ── */}
+          {tab === 'projects' && (
+            <div className="space-y-6">
+              <SubNav<ProjectsSub>
+                active={projectsSub}
+                onChange={(v) => { setProjectsSub(v); if (v !== 'estimation' && v !== 'cost-approval') setSelectedPipelineProjectId(null); }}
+                items={[
+                  { id: 'all', label: 'All Projects' },
+                  { id: 'pipeline', label: 'Pipeline' },
+                  ...(selectedPipelineProjectId ? [{ id: 'estimation' as ProjectsSub, label: 'Estimation' }] : []),
+                  ...(selectedPipelineProjectId ? [{ id: 'cost-approval' as ProjectsSub, label: 'Cost Approval' }] : []),
+                ]}
+              />
+              {projectsSub === 'all' && <ProjectsTab projects={projects} teams={teams} onRefresh={fetchData} />}
+              {projectsSub === 'pipeline' && (
+                <ProjectPipeline
+                  onSelectProject={(id) => { setSelectedPipelineProjectId(id); setProjectsSub('estimation'); }}
+                />
+              )}
+              {projectsSub === 'estimation' && selectedPipelineProjectId && (
+                <EstimationWorkspace
+                  projectId={selectedPipelineProjectId}
+                  onBack={() => { setSelectedPipelineProjectId(null); setProjectsSub('pipeline'); }}
+                />
+              )}
+              {projectsSub === 'cost-approval' && selectedPipelineProjectId && (
+                <CostApprovalCard
+                  projectId={selectedPipelineProjectId}
+                  onBack={() => { setSelectedPipelineProjectId(null); setProjectsSub('pipeline'); }}
+                  onAction={() => { setSelectedPipelineProjectId(null); setProjectsSub('pipeline'); }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* ── People ── */}
+          {tab === 'people' && (
+            <div className="space-y-6">
+              <SubNav<PeopleSub>
+                active={peopleSub}
+                onChange={(v) => { setPeopleSub(v); if (v !== 'resources') setSelectedResourceId(null); }}
+                items={[
+                  { id: 'teams', label: 'Teams' },
+                  { id: 'resources', label: 'Resources' },
+                  { id: 'skills', label: 'Skills Matrix' },
+                ]}
+              />
+              {peopleSub === 'teams' && <TeamsTab teams={teams} onRefresh={fetchData} />}
+              {peopleSub === 'resources' && (
+                selectedResourceId
+                  ? <ResourceDetail resourceId={selectedResourceId} onBack={() => setSelectedResourceId(null)} />
+                  : <ResourceDirectory onSelectResource={(id) => setSelectedResourceId(id)} />
+              )}
+              {peopleSub === 'skills' && <SkillsMatrix />}
+            </div>
+          )}
+
+          {/* ── AI ── */}
           {tab === 'ai' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> AI Capacity Analyst</CardTitle>
-                <CardDescription>Multi-turn analysis with tool use — AI can read and modify your capacity data</CardDescription>
-              </CardHeader>
-              <CardContent><AiChat /></CardContent>
-            </Card>
+            <div className="space-y-6">
+              <SubNav<AiSub>
+                active={aiSub}
+                onChange={setAiSub}
+                items={[
+                  { id: 'chat', label: 'Chat' },
+                  { id: 'intake', label: 'Intake' },
+                  { id: 'optimize', label: 'Optimize' },
+                  { id: 'briefing', label: 'Briefing' },
+                  { id: 'review', label: 'Review' },
+                ]}
+              />
+              {aiSub === 'chat' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> AI Capacity Analyst</CardTitle>
+                    <CardDescription>Multi-turn analysis with tool use — AI can read and modify your capacity data</CardDescription>
+                  </CardHeader>
+                  <CardContent><AiChat /></CardContent>
+                </Card>
+              )}
+              {aiSub === 'intake' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Inbox className="w-5 h-5 text-primary" /> AI Project Intake</CardTitle>
+                    <CardDescription>Describe a project in natural language and AI generates the complete record</CardDescription>
+                  </CardHeader>
+                  <CardContent><AiIntake onProjectAdded={fetchData} /></CardContent>
+                </Card>
+              )}
+              {aiSub === 'optimize' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" /> AI Optimization Engine</CardTitle>
+                    <CardDescription>AI-powered recommendations to optimize your portfolio, resources, hiring, and costs</CardDescription>
+                  </CardHeader>
+                  <CardContent><AiOptimizer onRefresh={fetchData} /></CardContent>
+                </Card>
+              )}
+              {aiSub === 'briefing' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Executive Briefing</CardTitle>
+                    <CardDescription>AI-generated board-ready capacity briefing from live data</CardDescription>
+                  </CardHeader>
+                  <CardContent><AiBriefing /></CardContent>
+                </Card>
+              )}
+              {aiSub === 'review' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><PlayCircle className="w-5 h-5 text-primary" /> Weekly Capacity Review</CardTitle>
+                    <CardDescription>Comprehensive AI review that replaces your weekly capacity meeting</CardDescription>
+                  </CardHeader>
+                  <CardContent><AiReview /></CardContent>
+                </Card>
+              )}
+            </div>
           )}
-          {tab === 'ai-intake' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Inbox className="w-5 h-5 text-primary" /> AI Project Intake</CardTitle>
-                <CardDescription>Describe a project in natural language and AI generates the complete record</CardDescription>
-              </CardHeader>
-              <CardContent><AiIntake onProjectAdded={fetchData} /></CardContent>
-            </Card>
+
+          {/* ── Settings ── */}
+          {tab === 'settings' && (
+            <div className="space-y-8">
+              <SettingsPage />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Layers className="w-5 h-5 text-primary" /> Scenarios</CardTitle>
+                  <CardDescription>What-if scenario planning and capacity modeling</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScenariosTab scenarios={scenarios} teams={teams} projects={projects} onRefresh={fetchData} />
+                </CardContent>
+              </Card>
+            </div>
           )}
-          {tab === 'ai-optimize' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" /> AI Optimization Engine</CardTitle>
-                <CardDescription>AI-powered recommendations to optimize your portfolio, resources, hiring, and costs</CardDescription>
-              </CardHeader>
-              <CardContent><AiOptimizer onRefresh={fetchData} /></CardContent>
-            </Card>
-          )}
-          {tab === 'ai-briefing' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Executive Briefing</CardTitle>
-                <CardDescription>AI-generated board-ready capacity briefing from live data</CardDescription>
-              </CardHeader>
-              <CardContent><AiBriefing /></CardContent>
-            </Card>
-          )}
-          {tab === 'ai-review' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><PlayCircle className="w-5 h-5 text-primary" /> Weekly Capacity Review</CardTitle>
-                <CardDescription>Comprehensive AI review that replaces your weekly capacity meeting</CardDescription>
-              </CardHeader>
-              <CardContent><AiReview /></CardContent>
-            </Card>
-          )}
-          {tab === 'reports' && <ReportsPage projects={projects} teams={teams} allocations={allocations} teamCapacities={teamCapacities} />}
-          {tab === 'pipeline' && !selectedPipelineProjectId && (
-            <ProjectPipeline
-              onSelectProject={(id) => { setSelectedPipelineProjectId(id); setTab('estimation'); }}
-            />
-          )}
-          {tab === 'estimation' && selectedPipelineProjectId && (
-            <EstimationWorkspace
-              projectId={selectedPipelineProjectId}
-              onBack={() => { setSelectedPipelineProjectId(null); setTab('pipeline'); }}
-            />
-          )}
-          {tab === 'cost-approval' && selectedPipelineProjectId && (
-            <CostApprovalCard
-              projectId={selectedPipelineProjectId}
-              onBack={() => { setSelectedPipelineProjectId(null); setTab('pipeline'); }}
-              onAction={() => { setSelectedPipelineProjectId(null); setTab('pipeline'); }}
-            />
-          )}
-          {tab === 'settings' && <SettingsPage />}
         </div>
       </main>
+    </div>
+  );
+}
+
+// Sub-navigation pill component
+function SubNav<T extends string>({ active, onChange, items }: { active: T; onChange: (v: T) => void; items: { id: T; label: string }[] }) {
+  return (
+    <div className="flex gap-1 p-1 bg-muted/50 rounded-xl w-fit">
+      {items.map(item => (
+        <button
+          key={item.id}
+          onClick={() => onChange(item.id)}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+            active === item.id
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }
