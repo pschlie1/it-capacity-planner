@@ -171,10 +171,7 @@ describe('Sanitization - XSS edge cases', () => {
   });
 
   it('strips nested script tags', () => {
-    // Nested script injection attempt — sanitizer strips everything (more secure than partial output)
-    const result = sanitize('<scr<script>ipt>alert(1)</scr</script>ipt>');
-    expect(result).not.toContain('alert');
-    expect(result).not.toContain('<script');
+    expect(sanitize('<scr<script>ipt>alert(1)</scr</script>ipt>')).toBe('');
   });
 
   it('handles unicode in sanitized content', () => {
