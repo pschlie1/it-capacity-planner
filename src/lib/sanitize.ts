@@ -19,6 +19,7 @@ export function sanitize(input: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
     // Re-strip any tags that appeared after decoding
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<[^>]*>/g, '')
     .trim();
 }
