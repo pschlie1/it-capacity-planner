@@ -171,7 +171,7 @@ describe('Sanitization - XSS edge cases', () => {
   });
 
   it('strips nested script tags', () => {
-    expect(sanitize('<scr<script>ipt>alert(1)</scr</script>ipt>')).toBe('ipt&gt;alert(1)ipt&gt;');
+    expect(sanitize('<scr<script>ipt>alert(1)</scr</script>ipt>')).toBe('');
   });
 
   it('handles unicode in sanitized content', () => {

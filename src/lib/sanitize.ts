@@ -4,12 +4,14 @@
  */
 export function sanitize(input: string): string {
   return input
-    // Strip HTML tags
+    // Strip script/style tags and their content
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    // Strip remaining HTML tags
     .replace(/<[^>]*>/g, '')
     // Remove javascript: protocol
     .replace(/javascript\s*:/gi, '')
-    // Remove on* event handlers that might survive
-    .replace(/on\w+\s*=/gi, '')
+    // Remove on* event handlers (word boundary to avoid eating adjacent text)
+    .replace(/\bon\w+\s*=/gi, '')
     // Decode common HTML entities
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
