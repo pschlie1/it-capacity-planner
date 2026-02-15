@@ -4,12 +4,15 @@
  */
 export function sanitize(input: string): string {
   return input
-    // Strip HTML tags
+    // Strip script/style tags WITH their content
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+    // Strip all remaining HTML tags
     .replace(/<[^>]*>/g, '')
     // Remove javascript: protocol
     .replace(/javascript\s*:/gi, '')
-    // Remove on* event handlers that might survive
-    .replace(/on\w+\s*=/gi, '')
+    // Remove on* event handlers — word boundary to avoid eating adjacent text
+    .replace(/\bon\w+\s*=/gi, '')
     // Decode common HTML entities
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -17,6 +20,7 @@ export function sanitize(input: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
     // Re-strip any tags that appeared after decoding
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<[^>]*>/g, '')
     .trim();
 }
